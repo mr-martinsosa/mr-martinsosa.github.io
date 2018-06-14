@@ -151,5 +151,6 @@ zoomOutContactButton.addEventListener("click", (event) => {
 })
 
 // Set bg music low to not bother everyone :)
-let bg = document.getElementById("music").play()
+let bg = document.getElementById("music")
 bg.volume = 0.2
+bg.play()
