@@ -23,7 +23,7 @@ export function initDungeon3D(opts) {
 	var LEN = 120;             /* length of the static corridor planes        */
 	var ROGUE_Z = 1.6;         /* rogue stands here; camera sits just behind  */
 	var CAM = { x: 0, y: 1.62, z: 4.3 };
-	var MAX_X = HALF_W - 0.6;  /* how far the rogue may strafe                */
+	var MAX_X = HALF_W - 1.2;  /* how far the rogue may strafe (keeps it inside the camera view) */
 	var SPAN = 56;             /* recycle distance for moving decor           */
 	var NEAR = CAM.z + 4;      /* recycle once decor passes this z            */
 	var BASE_SPD = 6.2;        /* units/sec walking; ×DASH_MUL while dashing  */
@@ -162,7 +162,7 @@ export function initDungeon3D(opts) {
 		o = o || {};
 		return new THREE.MeshPhongMaterial({ color: color, flatShading: true, shininess: o.shininess || 6, specular: o.specular || 0x14121a, emissive: o.emissive || 0x000000 });
 	}
-	var C_CLOAK = 0x352d4a, C_HOOD = 0x1a1626, C_TRIM = 0xe8c170, C_SKIN = 0x3a3048, C_STEEL = 0xcfd6e6;
+	var C_CLOAK = 0x241d36, C_HOOD = 0x14111e, C_TRIM = 0xe8c170, C_SKIN = 0x554862, C_STEEL = 0xcfd6e6, C_LEG = 0x161222;
 	/* a pivoting limb: a Group at the joint, with the limb hanging below the origin so it swings from the top */
 	function limb(len, w, color, jx, jy) {
 		var g = new THREE.Group(); g.position.set(jx, jy, 0);
@@ -170,7 +170,7 @@ export function initDungeon3D(opts) {
 		m.position.y = -len / 2; g.add(m); rogue.add(g); return g;
 	}
 	/* body: a 6-sided tapered cloak (narrow shoulders, flared hem) + a gold belt */
-	var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.34, 0.72, 6), flat(C_CLOAK));
+	var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.27, 0.82, 6), flat(C_CLOAK));
 	torso.position.y = 0.92; rogue.add(torso);
 	var belt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 6), flat(C_TRIM, { shininess: 30 }));
 	belt.position.y = 0.74; rogue.add(belt);
@@ -189,8 +189,8 @@ export function initDungeon3D(opts) {
 	/* arms (pivot at shoulders) + legs (pivot at hips) */
 	var armL = limb(0.42, 0.09, C_CLOAK, -0.22, 1.18);
 	var armR = limb(0.42, 0.09, C_CLOAK, 0.22, 1.18);
-	var legL = limb(0.5, 0.11, C_CLOAK, -0.1, 0.56);
-	var legR = limb(0.5, 0.11, C_CLOAK, 0.1, 0.56);
+	var legL = limb(0.5, 0.11, C_LEG, -0.1, 0.56);
+	var legR = limb(0.5, 0.11, C_LEG, 0.1, 0.56);
 	/* a little gold dagger in the right hand (on-brand with the sword motif) */
 	var dagger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05), flat(C_STEEL, { shininess: 60, specular: 0x9aa2b8 }));
 	dagger.position.y = -0.42; dagger.rotation.x = -0.35; armR.add(dagger);
@@ -338,7 +338,10 @@ export function initDungeon3D(opts) {
 		torso.rotation.z = sw * 0.05;
 		rogue.position.x += (heroX - rogue.position.x) * Math.min(1, dt * 14);
 		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
-		camera.position.x += (heroX * 0.22 - camera.position.x) * Math.min(1, dt * 6);
+		/* floating-camera drift — a gentle sway + bob so the view feels alive (seed of the 2a feel) */
+		var swayX = reduceMotion ? 0 : Math.sin(time * 0.32) * 0.22;
+		camera.position.x += ((heroX * 0.22 + swayX) - camera.position.x) * Math.min(1, dt * 5);
+		camera.position.y = CAM.y + (reduceMotion ? 0 : Math.sin(time * 0.5) * 0.07);
 		aura.position.x = rogue.position.x;
 		heroLight.position.x = rogue.position.x;   /* keep the hero light over the rogue as it strafes */
 		aura.material.opacity += ((dashing ? 0.85 : 0) - aura.material.opacity) * Math.min(1, dt * 12);
