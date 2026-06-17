@@ -22,19 +22,24 @@ export function initDungeon3D(opts) {
 	var xpEl = opts.xpEl;
 	if (!dungeon || !canvas) throw new Error("dungeon3d: missing canvas/host");
 
-	/* ---- world constants (units ≈ metres) ---- */
-	var HALF_W = 2.4;          /* corridor half-width: walls at x = ±HALF_W   */
-	var WALL_H = 3.4;          /* floor at y=0, ceiling at y=WALL_H           */
-	var LEN = 120;             /* length of the static corridor planes        */
-	var ROGUE_Z = 1.6;         /* rogue stands here; camera sits just behind  */
-	var CAM = { x: 0, y: 1.62, z: 4.3 };
+	/* ---- world constants (units ≈ metres) — a bounded CHAMBER (not an endless corridor) ---- */
+	var HALF_W = 6;            /* chamber half-width: side walls at x = ±HALF_W */
+	var WALL_H = 4.6;          /* floor at y=0, ceiling at y=WALL_H            */
+	var ROOM_FRONT = 4.5;      /* chamber front edge (just behind the camera)  */
+	var ROOM_BACK = -15;       /* back wall z                                  */
+	var ROOM_CZ = (ROOM_FRONT + ROOM_BACK) / 2;
+	var ROOM_DEPTH = ROOM_FRONT - ROOM_BACK;
+	var ROGUE_Z = -1.5;        /* where the character idles (centre-front of the room) */
+	var CAM = { x: 0, y: 1.75, z: 5.2 };
 	var FRAME_X = -0.7;        /* dolly the camera left so the rogue frames into the RIGHT-hand
 	                              negative space, clear of the lower-left content card (2a) */
-	var MAX_X = HALF_W - 1.2;  /* how far the rogue may strafe (keeps it inside the camera view) */
-	var SPAN = 56;             /* recycle distance for moving decor           */
-	var NEAR = CAM.z + 4;      /* recycle once decor passes this z            */
-	var BASE_SPD = 6.2;        /* units/sec walking; ×DASH_MUL while dashing  */
-	var DASH_MUL = 3.2;
+	var MAX_X = HALF_W - 1.6;  /* how far the character may roam in x          */
+	var MIN_Z = ROOM_BACK + 2.5, MAX_Z = ROOM_FRONT - 1.5;   /* character roam bounds in z */
+	var BASE_SPD = 5.0;        /* units/sec walking; ×DASH_MUL while dashing   */
+	var DASH_MUL = 3.0;
+	/* legacy aliases so the (now-static) decor build loops keep reading: nothing recycles in a bounded
+	   room, so SPAN/NEAR/LEN just describe the placement span down the chamber */
+	var LEN = ROOM_DEPTH, SPAN = ROOM_DEPTH, NEAR = ROOM_FRONT;
 
 	/* ---- renderer ---- */
 	var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "low-power" });
@@ -100,8 +105,8 @@ export function initDungeon3D(opts) {
 
 	/* ---- lighting: readable warm base + flickering torch pools ----
 	   (light COLORS must be reasonably bright — a dark ambient color emits almost nothing) */
-	scene.add(new THREE.AmbientLight(0x8a7f99, 3.0));
-	scene.add(new THREE.HemisphereLight(0x9c8fb4, 0x2e2438, 1.85));
+	scene.add(new THREE.AmbientLight(0x8a7f99, 3.4));
+	scene.add(new THREE.HemisphereLight(0x9c8fb4, 0x2e2438, 2.2));
 	/* a warm "hero" light that follows the rogue so the character always reads, wherever the torches are */
 	var heroLight = new THREE.PointLight(0xffd9a8, 26, 12, 2);
 	heroLight.position.set(0, 2.1, ROGUE_Z + 2.0); scene.add(heroLight);
@@ -160,30 +165,35 @@ export function initDungeon3D(opts) {
 	/* stone albedo lifted out of near-black into a saturated indigo/violet so torchlight has something
 	   vivid to catch — dark albedo stays dark no matter how bright the lights (2a polish) */
 	var wallTex = brickTex(0x2c2742, 0x16121f, 0x534873, 6, 10);
-	wallTex.repeat.set(LEN / 5, 2);
-	var floorTex = flagTex(0x221d30, 0x100c18); floorTex.repeat.set(2, LEN / 5);
-	var ceilTex = brickTex(0x1f1a2c, 0x0c0a12, 0x3c3454, 5, 10); ceilTex.repeat.set(LEN / 6, 2);
+	wallTex.repeat.set(ROOM_DEPTH / 5, WALL_H / 2.1);
+	var floorTex = flagTex(0x221d30, 0x100c18); floorTex.repeat.set(HALF_W * 2 / 4, ROOM_DEPTH / 4);
+	var ceilTex = brickTex(0x1f1a2c, 0x0c0a12, 0x3c3454, 5, 10); ceilTex.repeat.set(HALF_W * 2 / 5, ROOM_DEPTH / 5);
 
 	var lambo = function (tex) { return new THREE.MeshLambertMaterial({ map: tex }); };
+	function wallMesh(w, repU, repV, base) {
+		var tx = wallTex.clone(); tx.repeat.set(repU, repV); tx.needsUpdate = true;
+		return new THREE.Mesh(new THREE.PlaneGeometry(w, WALL_H), new THREE.MeshLambertMaterial({ map: tx }));
+	}
 
-	var floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, LEN), lambo(floorTex));
-	floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 0); scene.add(floor);
+	var floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, ROOM_DEPTH), lambo(floorTex));
+	floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, ROOM_CZ); scene.add(floor);
 
-	var ceil = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, LEN), lambo(ceilTex));
-	ceil.rotation.x = Math.PI / 2; ceil.position.set(0, WALL_H, 0); scene.add(ceil);
+	var ceil = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, ROOM_DEPTH), lambo(ceilTex));
+	ceil.rotation.x = Math.PI / 2; ceil.position.set(0, WALL_H, ROOM_CZ); scene.add(ceil);
 
-	var wallL = new THREE.Mesh(new THREE.PlaneGeometry(LEN, WALL_H), lambo(wallTex.clone()));
-	wallL.material.map.repeat.copy(wallTex.repeat); wallL.material.map.needsUpdate = true;
-	wallL.rotation.y = Math.PI / 2; wallL.position.set(-HALF_W, WALL_H / 2, 0); scene.add(wallL);
+	var wallL = wallMesh(ROOM_DEPTH, ROOM_DEPTH / 5, WALL_H / 2.1);
+	wallL.rotation.y = Math.PI / 2; wallL.position.set(-HALF_W, WALL_H / 2, ROOM_CZ); scene.add(wallL);
 
-	var wallR = new THREE.Mesh(new THREE.PlaneGeometry(LEN, WALL_H), lambo(wallTex.clone()));
-	wallR.material.map.repeat.copy(wallTex.repeat); wallR.material.map.needsUpdate = true;
-	wallR.rotation.y = -Math.PI / 2; wallR.position.set(HALF_W, WALL_H / 2, 0); scene.add(wallR);
+	var wallR = wallMesh(ROOM_DEPTH, ROOM_DEPTH / 5, WALL_H / 2.1);
+	wallR.rotation.y = -Math.PI / 2; wallR.position.set(HALF_W, WALL_H / 2, ROOM_CZ); scene.add(wallR);
 
-	/* ======================= passing arches (parallax) ======================= */
-	var archMat = new THREE.MeshLambertMaterial({ color: 0x100d18 });
+	/* back wall closes the chamber (its grand portal lands here) */
+	var wallB = wallMesh(HALF_W * 2, HALF_W * 2 / 5, WALL_H / 2.1);
+	wallB.position.set(0, WALL_H / 2, ROOM_BACK); scene.add(wallB);
+
+	/* (passing arches removed — a bounded room uses the fixed pillar colonnade for structure instead) */
 	var arches = [];
-	var ARCH_GAP = 8, ARCH_N = Math.ceil(SPAN / ARCH_GAP);
+	var ARCH_GAP = 8, ARCH_N = 0;
 	for (var ai = 0; ai < ARCH_N; ai++) {
 		var grp = new THREE.Group();
 		var lintel = new THREE.Mesh(new THREE.BoxGeometry(HALF_W * 2 + 0.3, 0.5, 0.4), archMat);
@@ -195,20 +205,25 @@ export function initDungeon3D(opts) {
 		scene.add(grp); arches.push(grp);
 	}
 
-	/* ======================= torches w/ live point-lights ======================= */
+	/* ======================= wall torches w/ point-lights ======================= */
 	var flameTex = radialTex("rgba(255,228,150,1)", "rgba(214,90,31,0)");
+	var torchMat = new THREE.MeshLambertMaterial({ color: 0x2a2030 });
 	var torches = [];
-	var TORCH_GAP = 14, TORCH_N = Math.ceil(SPAN / TORCH_GAP);
-	for (var ti = 0; ti < TORCH_N; ti++) {
-		var side = (ti % 2) ? 1 : -1;
-		var t = new THREE.Group();
-		var bracket = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.18), new THREE.MeshLambertMaterial({ color: 0x2a2030 }));
-		bracket.position.set(side * (HALF_W - 0.12), 2.0, 0); t.add(bracket);
+	/* line both side walls; the two near torches carry a real light (warm pools), the rest glow via bloom */
+	var TORCH_POS = [
+		{ s: -1, z: -2.5, light: true }, { s: 1, z: -2.5, light: true },
+		{ s: -1, z: -8, light: false }, { s: 1, z: -8, light: false },
+		{ s: -1, z: -13, light: false }, { s: 1, z: -13, light: false }
+	];
+	for (var ti = 0; ti < TORCH_POS.length; ti++) {
+		var tp = TORCH_POS[ti], t = new THREE.Group();
+		var bracket = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.18), torchMat);
+		bracket.position.set(tp.s * (HALF_W - 0.12), 2.3, 0); t.add(bracket);
 		var flame = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-		flame.position.set(side * (HALF_W - 0.12), 2.5, 0.02); t.add(flame);
-		var light = new THREE.PointLight(0xff8a3d, 38, 20, 2);
-		light.position.set(side * (HALF_W - 0.3), 2.45, 0); t.add(light);
-		t.position.z = NEAR - (ti + 1) * TORCH_GAP;
+		flame.position.set(tp.s * (HALF_W - 0.12), 2.8, 0.02); t.add(flame);
+		var light = null;
+		if (tp.light) { light = new THREE.PointLight(0xff8a3d, 34, 16, 2); light.position.set(tp.s * (HALF_W - 0.3), 2.75, 0); t.add(light); }
+		t.position.z = tp.z;
 		t.userData = { flame: flame, light: light, seed: rnd() * 6.28 };
 		scene.add(t); torches.push(t);
 	}
@@ -364,12 +379,11 @@ export function initDungeon3D(opts) {
 	function mkAt(geo, mat, x, y, z) { var m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); return m; }
 
 	var dressing = [];
-	/* stations must tile the wrap window exactly (N*GAP === SPAN) or wrap() overlaps + pops them, like
-	   the arches (8×7) and torches (14×4) do; ~11-unit spacing → 5 stations of SPAN/5 */
-	var STATION_N = Math.round(SPAN / 11), STATION_GAP = SPAN / STATION_N;
+	/* a fixed colonnade down the bounded room (nothing recycles now, so just spread evenly front→back) */
+	var STATION_N = 5;
 	for (var sti = 0; sti < STATION_N; sti++) {
 		var st = new THREE.Group();
-		st.add(makePillar(-(HALF_W - 0.28))); st.add(makePillar(HALF_W - 0.28));
+		st.add(makePillar(-(HALF_W - 0.4))); st.add(makePillar(HALF_W - 0.4));
 		var bside = (sti % 2) ? 1 : -1;
 		st.add(makeBanner(BANNER_COLS[sti % BANNER_COLS.length], bside));
 		var brazier = null;
@@ -382,7 +396,7 @@ export function initDungeon3D(opts) {
 			var px = -bside * (HALF_W - 0.5);
 			st.add(makeBarrel(px)); st.add(makeCrate(px - bside * 0.45, 0.42, 0.4));
 		}
-		st.position.z = NEAR - (sti + 1) * STATION_GAP;
+		st.position.z = (ROOM_FRONT - 1.5) - sti * ((ROOM_DEPTH - 3) / (STATION_N - 1));   /* even spread, front→back */
 		st.userData = { brazier: brazier };
 		scene.add(st); dressing.push(st);
 	}
@@ -397,8 +411,8 @@ export function initDungeon3D(opts) {
 		g.beginPath(); g.moveTo(cx, S / 2 - r); g.lineTo(cx + r, S / 2); g.lineTo(cx, S / 2 + r); g.lineTo(cx - r, S / 2); g.closePath(); g.fill();
 	});
 	runnerTex.repeat.set(1, LEN / 5);   /* match the floor's texels-per-unit so the same scroll delta stays locked */
-	var runner = new THREE.Mesh(new THREE.PlaneGeometry(1.5, LEN), new THREE.MeshLambertMaterial({ map: runnerTex }));
-	runner.rotation.x = -Math.PI / 2; runner.position.set(0, 0.015, 0); scene.add(runner);
+	var runner = new THREE.Mesh(new THREE.PlaneGeometry(1.8, ROOM_DEPTH), new THREE.MeshLambertMaterial({ map: runnerTex }));
+	runner.rotation.x = -Math.PI / 2; runner.position.set(0, 0.015, ROOM_CZ); scene.add(runner);
 
 	/* ======================= slimes (real 3D meshes) ======================= */
 	var slimeBody = new THREE.MeshPhongMaterial({ color: 0x6ab04c, emissive: 0x12300d, shininess: 40, specular: 0x9fe07f, flatShading: true });
@@ -584,7 +598,7 @@ export function initDungeon3D(opts) {
 
 	/* ======================= input (mirrors the 2D dungeon) ======================= */
 	var WATCH = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1 };
-	var keys = {}, pointerDir = 0, heroX = 0, stepPhase = 0, dashT = 0, dashCd = 0, xp = 0;
+	var keys = {}, pointerDir = 0, heroX = 0, heroZ = ROGUE_Z, stepPhase = 0, dashT = 0, dashCd = 0, xp = 0;
 
 	function anyKey() { for (var k in keys) if (keys[k]) return true; return false; }
 	dungeon.addEventListener("keydown", function (e) {
@@ -661,10 +675,10 @@ export function initDungeon3D(opts) {
 		if (dashing && !(up || dn || lf || rt)) up = true;   /* dash forward if nothing held */
 		var moving = up || dn || lf || rt;
 		var spd = BASE_SPD * (dashing ? DASH_MUL : 1) * dt;
+		var dz = 0;   /* bounded room: no world-scroll — decor is static and wrap() no-ops within the window */
 
-		/* forward/back → scroll the world toward/past the camera */
-		var dz = 0;
-		if (up) dz = spd; else if (dn) dz = -spd;
+		/* walk the character around the bounded chamber (forward = into the room, -z) */
+		if (up) heroZ = Math.max(MIN_Z, heroZ - spd); else if (dn) heroZ = Math.min(MAX_Z, heroZ + spd);
 		if (rt) heroX = Math.min(MAX_X, heroX + spd);
 		if (lf) heroX = Math.max(-MAX_X, heroX - spd);
 
@@ -691,25 +705,21 @@ export function initDungeon3D(opts) {
 			torso.rotation.z = sw * 0.05;
 			rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
 		}
-		rogue.position.x += (heroX - rogue.position.x) * Math.min(1, dt * 14);
+		var lk = Math.min(1, dt * 14);
+		rogue.position.x += (heroX - rogue.position.x) * lk;
+		rogue.position.z += (heroZ - rogue.position.z) * lk;
 		/* camera: 2a floating-drift while "home"; 2b click-to-fly tween while flying/focused/returning */
 		updateCamera(dt, time, heroX);
-		aura.position.x = rogue.position.x;
-		heroLight.position.x = rogue.position.x;   /* keep the hero light over the rogue as it strafes */
+		aura.position.x = rogue.position.x; aura.position.z = rogue.position.z;
+		heroLight.position.x = rogue.position.x;                 /* keep the hero light over the character */
+		heroLight.position.z = rogue.position.z + 1.5;
 		aura.material.opacity += ((dashing ? 0.85 : 0) - aura.material.opacity) * Math.min(1, dt * 12);
-
-		/* scroll the shell textures so the stone surfaces move with you */
-		if (dz !== 0) {
-			floorTex.offset.y -= dz * 0.18; ceilTex.offset.x += dz * 0.12;
-			wallL.material.map.offset.x -= dz * 0.16; wallR.material.map.offset.x += dz * 0.16;
-			runnerTex.offset.y -= dz * 0.18;   /* keep the carpet in sync with the flagstones */
-		}
 
 		/* is anything still in motion? idle frames are throttled (and frozen under reduced-motion)
 		   so an on-screen-but-idle visitor isn't paying full 60fps GPU cost for nothing */
 		var i, dying = false;
 		for (i = 0; i < slimes.length; i++) if (slimes[i].dyingT > 0) { dying = true; break; }
-		var settling = Math.abs(heroX - rogue.position.x) > 0.001 || aura.material.opacity > 0.003;
+		var settling = Math.abs(heroX - rogue.position.x) > 0.001 || Math.abs(heroZ - rogue.position.z) > 0.001 || aura.material.opacity > 0.003;
 		var camMoving = camMode === "flying" || camMode === "returning";
 		var activeNow = moving || dashing || settling || dying || camMoving;
 
@@ -720,9 +730,9 @@ export function initDungeon3D(opts) {
 		if (doRender) {
 			for (i = 0; i < arches.length; i++) wrap(arches[i], dz);
 			for (i = 0; i < torches.length; i++) {
-				var T = torches[i]; wrap(T, dz);
+				var T = torches[i];
 				var fl = reduceMotion ? 0.85 : 0.72 + Math.sin(time * 11 + T.userData.seed) * 0.12 + Math.sin(time * 23 + T.userData.seed) * 0.08;
-				T.userData.light.intensity = 38 * fl;
+				if (T.userData.light) T.userData.light.intensity = 34 * fl;
 				T.userData.flame.scale.set(0.85 + fl * 0.3, 0.8 + fl * 0.4, 1);
 				T.userData.flame.material.opacity = 0.7 + fl * 0.3;
 			}
@@ -761,8 +771,8 @@ export function initDungeon3D(opts) {
 				wrap(s.group, dz);
 				s.body.position.y = 0.3 + (reduceMotion ? 0 : Math.abs(Math.sin(time * 3 + s.seed)) * 0.06);
 				if (dashing && s.alive &&
-					Math.abs(s.group.position.z - ROGUE_Z) < 1.3 &&
-					Math.abs(s.group.position.x - rogue.position.x) < 0.8) {
+					Math.abs(s.group.position.z - rogue.position.z) < 1.1 &&
+					Math.abs(s.group.position.x - rogue.position.x) < 0.9) {
 					s.alive = false; s.dyingT = 0.32;
 					slimeEye.set(s.group.position.x, 0.5, s.group.position.z);
 					popXP(slimeEye);

@@ -117,11 +117,13 @@
 	/* x/z are world coords down the hall. All sit centre-to-RIGHT so their pills clear the lower-left
 	   content card, and the depths are spread so corridor perspective fans them into a clean
 	   receding line rather than a cluster at the vanishing point. */
+	/* placed around the CHAMBER (right + centre + the grand portal on the back wall); kept clear of the
+	   lower-left content card, with placeHotspots()'s card-aware clamp as backup */
 	var HOTSPOTS = [
-		{ id: "skills",   sel: "#skills",    label: "Skills",     sprite: "spr-potion", kind: "altar",   x: 1.85, z: -5  },
-		{ id: "projects", sel: "#quests",    label: "Projects",   sprite: "spr-chest",  kind: "chest",   x: 1.5,  z: -9  },
-		{ id: "exp",      sel: "#chronicle", label: "Experience", sprite: "spr-scroll", kind: "lectern", x: 0.8,  z: -13 },
-		{ id: "contact",  sel: "#contact",   label: "Contact",    sprite: "spr-heart",  kind: "portal",  x: 0,    z: -17.5 }
+		{ id: "skills",   sel: "#skills",    label: "Skills",     sprite: "spr-potion", kind: "altar",   x: 3.0, z: -3.5  },
+		{ id: "projects", sel: "#quests",    label: "Projects",   sprite: "spr-chest",  kind: "chest",   x: 4.3, z: -7.5  },
+		{ id: "exp",      sel: "#chronicle", label: "Experience", sprite: "spr-scroll", kind: "lectern", x: 2.4, z: -11   },
+		{ id: "contact",  sel: "#contact",   label: "Contact",    sprite: "spr-heart",  kind: "portal",  x: 0,   z: -14.3 }
 	];
 	var TARGET_TO_HOTSPOT = { "#skills": "skills", "#quests": "projects", "#chronicle": "exp", "#contact": "contact" };
 
