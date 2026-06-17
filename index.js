@@ -52,6 +52,58 @@
 		sections.forEach(function (s) { spy.observe(s); });
 	}
 
+	/* ---- RPG pause menu: the accessible, no-game-required way into everything ---- */
+	var menuBtn = document.getElementById("menu-btn");
+	var menu = document.getElementById("rpg-menu");
+	if (menuBtn && menu) {
+		var menuItems = Array.prototype.slice.call(menu.querySelectorAll(".rpg-menu__item, .rpg-menu__close"));
+		var lastFocus = null;
+
+		function openMenu() {
+			lastFocus = document.activeElement;
+			menu.hidden = false;
+			menuBtn.setAttribute("aria-expanded", "true");
+			document.body.style.overflow = "hidden";
+			if (menuItems[0]) menuItems[0].focus();
+		}
+		function closeMenu(restore) {
+			if (menu.hidden) return;
+			menu.hidden = true;
+			menuBtn.setAttribute("aria-expanded", "false");
+			document.body.style.overflow = "";
+			if (restore !== false && lastFocus && lastFocus.focus) lastFocus.focus();
+		}
+
+		menuBtn.addEventListener("click", openMenu);
+		menu.addEventListener("click", function (e) {
+			if (e.target.closest("[data-close]")) { closeMenu(); return; }
+			var item = e.target.closest(".rpg-menu__item");
+			if (!item) return;
+			var sel = item.getAttribute("data-target");
+			var dest = sel && document.querySelector(sel);
+			closeMenu(false);
+			if (!dest) return;
+			dest.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+			/* hand focus to the destination heading so keyboard/screen-reader users land there */
+			var focusTarget = (sel === "#top") ? document.querySelector(".char-sheet__name") : (dest.querySelector("h1, h2, h3") || dest);
+			if (focusTarget) { focusTarget.setAttribute("tabindex", "-1"); focusTarget.focus({ preventScroll: true }); }
+		});
+		document.addEventListener("keydown", function (e) {
+			if (menu.hidden) return;
+			if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }
+			if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+				e.preventDefault();
+				var idx = menuItems.indexOf(document.activeElement);
+				idx = (idx === -1) ? 0 : (idx + (e.key === "ArrowDown" ? 1 : menuItems.length - 1)) % menuItems.length;
+				menuItems[idx].focus();
+			} else if (e.key === "Tab") {     /* keep focus trapped inside the dialog */
+				var first = menuItems[0], last = menuItems[menuItems.length - 1];
+				if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+				else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
+		});
+	}
+
 	/* ---- mini-dungeon: real-3D (Three.js) when supported, hand-rolled 2.5D otherwise ---- */
 	var dungeon = document.getElementById("dungeon");
 	var heroEl = document.getElementById("hero-rogue");

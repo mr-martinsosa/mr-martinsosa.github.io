@@ -125,6 +125,48 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .hud__audio[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
 .hud__audio-ico { color: var(--gold); font-size: 12px; }
 
+/* prominent, plain-language way in — sits right next to the brand */
+.hud__menu {
+	display: inline-flex; align-items: center; gap: .45rem;
+	font-family: var(--f-pixel); font-size: 10px; letter-spacing: 1px;
+	color: var(--void); background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+	border: 2px solid var(--gold-soft); border-radius: var(--radius);
+	padding: .5rem .7rem; cursor: pointer;
+	box-shadow: inset 1px 1px 0 rgba(255,255,255,.3), 0 3px 0 var(--torch-deep);
+	transition: transform .08s ease, background .15s ease;
+}
+.hud__menu:hover { background: linear-gradient(180deg, var(--gold-soft), var(--gold)); transform: translateY(-1px); }
+.hud__menu:active { transform: translateY(2px); box-shadow: inset 1px 1px 0 rgba(0,0,0,.4); }
+.hud__menu-ico { font-size: 13px; }
+
+/* ============================ RPG pause menu ============================ */
+.rpg-menu { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 1.2rem; }
+.rpg-menu[hidden] { display: none; }
+.rpg-menu__backdrop { position: absolute; inset: 0; background: rgba(5,4,10,.82); backdrop-filter: blur(4px); cursor: pointer; }
+.rpg-menu__panel { position: relative; z-index: 1; width: 100%; max-width: 430px; animation: menu-in .18s ease-out; }
+.rpg-menu__title { font-size: 16px; color: var(--gold); margin: 0; text-shadow: 0 2px 0 var(--gold-deep); }
+.rpg-menu__hint { font-family: var(--f-body); color: var(--ink-dim); margin: .5rem 0 1.3rem; font-size: 1.05rem; }
+.rpg-menu__list { display: flex; flex-direction: column; gap: .55rem; }
+.rpg-menu__item {
+	display: flex; align-items: center; gap: .8rem; width: 100%; text-align: left;
+	font-family: var(--f-pixel); font-size: 11px; line-height: 1.5; color: var(--ink);
+	background: var(--stone-2); border: 2px solid var(--stone-edge); border-left-width: 5px; border-radius: var(--radius);
+	padding: .85rem .9rem; cursor: pointer;
+	transition: border-color .12s ease, background .12s ease, transform .08s ease, color .12s ease;
+}
+.rpg-menu__item:hover, .rpg-menu__item:focus-visible {
+	color: var(--gold-soft); border-left-color: var(--gold); background: var(--stone-hi); transform: translateX(4px); outline: none;
+}
+.rpg-menu__item .sprite--menu { width: 24px; height: 24px; flex: none; }
+.rpg-menu__item em { color: var(--ink-dim); font-style: normal; font-size: 9px; letter-spacing: .5px; }
+.rpg-menu__close {
+	margin-top: 1.3rem; width: 100%; font-family: var(--f-pixel); font-size: 10px; color: var(--ink-dim);
+	background: transparent; border: 2px solid var(--stone-edge); border-radius: var(--radius); padding: .75rem; cursor: pointer;
+	transition: color .12s ease, border-color .12s ease;
+}
+.rpg-menu__close:hover, .rpg-menu__close:focus-visible { color: var(--gold); border-color: var(--gold-deep); outline: none; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
 /* ------------------------- panel (9-slice-ish) --------------------- */
 .panel {
 	position: relative;

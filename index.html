@@ -180,6 +180,9 @@
 			<span class="hud__glyph" aria-hidden="true">@</span>
 			<span class="hud__name">MARTIN SOSA</span>
 		</a>
+		<button id="menu-btn" class="hud__menu" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="rpg-menu">
+			<span class="hud__menu-ico" aria-hidden="true">☰</span> MENU
+		</button>
 		<nav class="hud__nav" aria-label="Primary">
 			<a href="#skills">Skills</a>
 			<a href="#quests">Quests</a>
@@ -544,7 +547,22 @@
 		<p class="foot__line foot__line--dim">© <span id="year">2026</span> Martin Sosa · New York, NY · <span class="foot__hint">try the ↑↑↓↓←→←→BA</span></p>
 	</footer>
 
-	<!-- (slimes now live inside the mini-dungeon) -->
+	<!-- ===== RPG pause menu — the accessible, no-game-required way into everything ===== -->
+	<div id="rpg-menu" class="rpg-menu" role="dialog" aria-modal="true" aria-labelledby="rpg-menu-title" hidden>
+		<div class="rpg-menu__backdrop" data-close></div>
+		<div class="rpg-menu__panel panel">
+			<h2 id="rpg-menu-title" class="rpg-menu__title">▸ Menu</h2>
+			<p class="rpg-menu__hint">Jump straight to anything — no game required.</p>
+			<ul class="rpg-menu__list">
+				<li><button class="rpg-menu__item" type="button" data-target="#top"><svg class="sprite sprite--menu" aria-hidden="true"><use href="#spr-heart"/></svg> <span>About Me</span></button></li>
+				<li><button class="rpg-menu__item" type="button" data-target="#skills"><svg class="sprite sprite--menu" aria-hidden="true"><use href="#spr-potion"/></svg> <span>Skills &amp; Loadout</span></button></li>
+				<li><button class="rpg-menu__item" type="button" data-target="#quests"><svg class="sprite sprite--menu" aria-hidden="true"><use href="#spr-sword"/></svg> <span>Projects <em>· Quest Log</em></span></button></li>
+				<li><button class="rpg-menu__item" type="button" data-target="#chronicle"><svg class="sprite sprite--menu" aria-hidden="true"><use href="#spr-scroll"/></svg> <span>Experience <em>· Chronicle</em></span></button></li>
+				<li><button class="rpg-menu__item" type="button" data-target="#contact"><svg class="sprite sprite--menu" aria-hidden="true"><use href="#spr-chest"/></svg> <span>Contact</span></button></li>
+			</ul>
+			<button class="rpg-menu__close" type="button" data-close>✕ Close</button>
+		</div>
+	</div>
 
 	<!-- optional dungeon ambience: reuses the track from the original site, off by default -->
 	<audio id="ambience" loop preload="none" src="legacy/audio/music.mp3"></audio>

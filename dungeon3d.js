@@ -5,8 +5,9 @@
    falls back to the hand-rolled 2.5D corridor otherwise.
 
    Vendored Three.js (r160), imported by relative path — no CDN, no
-   importmap, works offline. Reuses hero-rogue.png as a billboard sprite
-   so the rogue keeps its pixel-art identity.
+   importmap, works offline. The rogue and slimes are procedural low-poly
+   (flat-shaded primitives) — no external model assets yet; asset-pack models
+   come in the full-world build phase.
    ===================================================================== */
 import * as THREE from "./vendor/three.module.min.js";
 
@@ -150,32 +151,52 @@ export function initDungeon3D(opts) {
 		scene.add(t); torches.push(t);
 	}
 
-	/* ======================= the rogue (billboard sprite) ======================= */
-	var ROGUE_H = 1.7, ROGUE_W = ROGUE_H * (24 / 32);
-	var rogue = new THREE.Group(); rogue.position.set(0, 0, ROGUE_Z); scene.add(rogue);
-	var rogueMat = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide });
-	var rogueSprite = new THREE.Mesh(new THREE.PlaneGeometry(ROGUE_W, ROGUE_H), rogueMat);
-	rogueSprite.position.y = ROGUE_H / 2; rogue.add(rogueSprite);
-	/* soft contact shadow under the rogue */
-	var shadowTex = radialTex("rgba(0,0,0,0.55)", "rgba(0,0,0,0)");
-	var shadow = new THREE.Mesh(new THREE.PlaneGeometry(ROGUE_W * 1.3, ROGUE_W * 1.3), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
-	shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; rogue.add(shadow);
-	/* dash aura (fades in while dashing) */
-	var aura = new THREE.Mesh(new THREE.PlaneGeometry(ROGUE_W * 2.4, ROGUE_H * 1.4), new THREE.MeshBasicMaterial({ map: radialTex("rgba(255,138,61,0.8)", "rgba(255,138,61,0)"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
-	aura.position.set(0, ROGUE_H / 2, -0.05); rogue.add(aura);
+	/* ======================= the rogue (procedural low-poly, flat-shaded) ======================= */
+	var ROGUE_H = 1.7;
+	var rogue = new THREE.Group(); rogue.position.set(0, 0, ROGUE_Z); rogue.rotation.y = Math.PI; scene.add(rogue);
+	function flat(color, o) {
+		o = o || {};
+		return new THREE.MeshPhongMaterial({ color: color, flatShading: true, shininess: o.shininess || 6, specular: o.specular || 0x14121a, emissive: o.emissive || 0x000000 });
+	}
+	var C_CLOAK = 0x241f33, C_HOOD = 0x15131d, C_TRIM = 0xe8c170, C_SKIN = 0x2a2330, C_STEEL = 0xcfd6e6;
+	/* a pivoting limb: a Group at the joint, with the limb hanging below the origin so it swings from the top */
+	function limb(len, w, color, jx, jy) {
+		var g = new THREE.Group(); g.position.set(jx, jy, 0);
+		var m = new THREE.Mesh(new THREE.BoxGeometry(w, len, w), flat(color));
+		m.position.y = -len / 2; g.add(m); rogue.add(g); return g;
+	}
+	/* body: a 6-sided tapered cloak (narrow shoulders, flared hem) + a gold belt */
+	var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.34, 0.72, 6), flat(C_CLOAK));
+	torso.position.y = 0.92; rogue.add(torso);
+	var belt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 6), flat(C_TRIM, { shininess: 30 }));
+	belt.position.y = 0.74; rogue.add(belt);
+	/* head + pointed hood, with two faint gold eyes peering out */
+	var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15, 0), flat(C_SKIN));
+	head.position.y = 1.4; rogue.add(head);
+	var hood = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.42, 6), flat(C_HOOD));
+	hood.position.set(0, 1.46, -0.02); rogue.add(hood);
+	var gaze = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: C_TRIM }));
+	gaze.position.set(0, 1.4, 0.135); rogue.add(gaze);
+	/* arms (pivot at shoulders) + legs (pivot at hips) */
+	var armL = limb(0.42, 0.09, C_CLOAK, -0.22, 1.18);
+	var armR = limb(0.42, 0.09, C_CLOAK, 0.22, 1.18);
+	var legL = limb(0.5, 0.11, C_HOOD, -0.1, 0.56);
+	var legR = limb(0.5, 0.11, C_HOOD, 0.1, 0.56);
+	/* a little gold dagger in the right hand (on-brand with the sword motif) */
+	var dagger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05), flat(C_STEEL, { shininess: 60, specular: 0x9aa2b8 }));
+	dagger.position.y = -0.42; dagger.rotation.x = -0.35; armR.add(dagger);
+	var rogueFacing = Math.PI;   /* heading in radians; starts looking away, down the hall */
 
-	var FRAME = { front: 0, side: 1 / 3, back: 2 / 3 };   /* hero-rogue.png order: front | side | back */
-	new THREE.TextureLoader().load("hero-rogue.png", function (tex) {
-		tex.colorSpace = THREE.SRGBColorSpace;
-		tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
-		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-		tex.repeat.x = 1 / 3; tex.offset.x = FRAME.front;
-		rogueMat.map = tex; rogueMat.needsUpdate = true;
-		markDirty();   /* repaint once the sprite has loaded (matters if the loop has parked) */
-	});
+	/* soft contact shadow (stays flat under the rogue as it turns) */
+	var shadowTex = radialTex("rgba(0,0,0,0.55)", "rgba(0,0,0,0)");
+	var shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+	shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; rogue.add(shadow);
+	/* dash aura — a scene-space billboard so it always faces the camera (not parented to the turning rogue) */
+	var aura = new THREE.Mesh(new THREE.PlaneGeometry(1.7, ROGUE_H * 1.25), new THREE.MeshBasicMaterial({ map: radialTex("rgba(255,138,61,0.8)", "rgba(255,138,61,0)"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+	aura.position.set(0, 0.9, ROGUE_Z); scene.add(aura);
 
 	/* ======================= slimes (real 3D meshes) ======================= */
-	var slimeBody = new THREE.MeshPhongMaterial({ color: 0x6ab04c, emissive: 0x12300d, shininess: 40, specular: 0x9fe07f });
+	var slimeBody = new THREE.MeshPhongMaterial({ color: 0x6ab04c, emissive: 0x12300d, shininess: 40, specular: 0x9fe07f, flatShading: true });
 	var eyeW = new THREE.MeshBasicMaterial({ color: 0xeef2fb });
 	var eyeB = new THREE.MeshBasicMaterial({ color: 0x0b0a10 });
 	var slimes = [];
@@ -187,7 +208,7 @@ export function initDungeon3D(opts) {
 	}
 	for (var si = 0; si < 5; si++) {
 		var sg = new THREE.Group();
-		var body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), slimeBody);
+		var body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.46, 1), slimeBody);
 		body.scale.y = 0.66; body.position.y = 0.3; sg.add(body);
 		var e1 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), eyeB); e1.position.set(-0.13, 0.34, 0.34); sg.add(e1);
 		var e2 = e1.clone(); e2.position.x = 0.13; sg.add(e2);
@@ -295,21 +316,21 @@ export function initDungeon3D(opts) {
 		if (rt) heroX = Math.min(MAX_X, heroX + spd);
 		if (lf) heroX = Math.max(-MAX_X, heroX - spd);
 
-		/* rogue facing: forward shows the back, back shows the face, strafing shows the side */
-		if (rogueMat.map) {
-			if (up) rogueMat.map.offset.x = FRAME.back;
-			else if (dn) rogueMat.map.offset.x = FRAME.front;
-			else if (lf || rt) rogueMat.map.offset.x = FRAME.side;
-			else rogueMat.map.offset.x = FRAME.front;
-		}
-		rogueSprite.scale.x = (lf && !rt) ? -1 : 1;
+		/* turn the rogue to face the way it's heading (atan2 so diagonals work), lerped for a smooth pivot */
+		if (moving) rogueFacing = Math.atan2((rt ? 1 : 0) - (lf ? 1 : 0), (dn ? 1 : 0) - (up ? 1 : 0));
+		var dRot = Math.atan2(Math.sin(rogueFacing - rogue.rotation.y), Math.cos(rogueFacing - rogue.rotation.y));
+		rogue.rotation.y += dRot * Math.min(1, dt * 10);
 
-		/* glide the rogue + a hint of camera follow (user-driven, always runs);
-		   the step bob is autonomous, so reduced-motion pins it flat */
+		/* walk cycle: swing the limbs from their joints; reduced-motion holds a still pose */
 		if (moving && !reduceMotion) stepPhase = (stepPhase + dt * (dashing ? 22 : 12)) % (Math.PI * 2);
+		var sw = (moving && !reduceMotion) ? Math.sin(stepPhase) * (dashing ? 0.95 : 0.6) : 0;
+		armL.rotation.x = sw; armR.rotation.x = -sw;
+		legL.rotation.x = -sw; legR.rotation.x = sw;
+		torso.rotation.z = sw * 0.05;
 		rogue.position.x += (heroX - rogue.position.x) * Math.min(1, dt * 14);
-		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase)) * 0.07 : 0;
+		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
 		camera.position.x += (heroX * 0.22 - camera.position.x) * Math.min(1, dt * 6);
+		aura.position.x = rogue.position.x;
 		aura.material.opacity += ((dashing ? 0.85 : 0) - aura.material.opacity) * Math.min(1, dt * 12);
 
 		/* scroll the shell textures so the stone surfaces move with you */
