@@ -23,6 +23,8 @@ export function initDungeon3D(opts) {
 	var LEN = 120;             /* length of the static corridor planes        */
 	var ROGUE_Z = 1.6;         /* rogue stands here; camera sits just behind  */
 	var CAM = { x: 0, y: 1.62, z: 4.3 };
+	var FRAME_X = -0.7;        /* dolly the camera left so the rogue frames into the RIGHT-hand
+	                              negative space, clear of the lower-left content card (2a) */
 	var MAX_X = HALF_W - 1.2;  /* how far the rogue may strafe (keeps it inside the camera view) */
 	var SPAN = 56;             /* recycle distance for moving decor           */
 	var NEAR = CAM.z + 4;      /* recycle once decor passes this z            */
@@ -35,19 +37,32 @@ export function initDungeon3D(opts) {
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 	var scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x0c0a14);
-	scene.fog = new THREE.FogExp2(0x0c0a14, 0.04);   /* hides the far recycle seam + sells depth */
+	/* a richer, slightly-lit purple haze instead of near-black — the far hall glows rather than
+	   crushing to black, which reads as more vivid + sells depth (2a polish) */
+	scene.background = new THREE.Color(0x171026);
+	scene.fog = new THREE.FogExp2(0x1b1330, 0.034);   /* hides the far recycle seam + sells depth */
 
 	var camera = new THREE.PerspectiveCamera(64, 1, 0.1, 200);
 	camera.position.set(CAM.x, CAM.y, CAM.z);
-	camera.lookAt(0, 1.15, -12);
+	camera.lookAt(0, 1.15, -12);     /* establish a parallel-in-x orientation while still centered... */
+	camera.position.x = FRAME_X;     /* ...then dolly left WITHOUT re-aiming, framing the rogue right-of-centre */
+
+	/* fixed forward vector for the "home" idle view: looking at (camera.pos + F0) every frame
+	   reproduces that orientation exactly (so the 2a drift is preserved), while a fly tween instead
+	   eases position + a separate look target toward a landmark and back (2b click-to-fly). */
+	var F0 = new THREE.Vector3(0, 1.15, -12).sub(new THREE.Vector3(CAM.x, CAM.y, CAM.z)).normalize();
+	var camMode = "home";            /* "home" | "flying" | "focused" | "returning" */
+	var tweenT = 0, tweenDur = 0.85, pendingArrive = null;
+	var homePos = new THREE.Vector3(), lookAt = new THREE.Vector3();
+	var fromPos = new THREE.Vector3(), toPos = new THREE.Vector3();
+	var fromLook = new THREE.Vector3(), toLook = new THREE.Vector3();
 
 	/* ---- lighting: readable warm base + flickering torch pools ----
 	   (light COLORS must be reasonably bright — a dark ambient color emits almost nothing) */
-	scene.add(new THREE.AmbientLight(0x6b6276, 2.6));
-	scene.add(new THREE.HemisphereLight(0x8a7d9c, 0x241c2c, 1.5));
+	scene.add(new THREE.AmbientLight(0x8a7f99, 3.0));
+	scene.add(new THREE.HemisphereLight(0x9c8fb4, 0x2e2438, 1.85));
 	/* a warm "hero" light that follows the rogue so the character always reads, wherever the torches are */
-	var heroLight = new THREE.PointLight(0xffd9a8, 20, 10, 2);
+	var heroLight = new THREE.PointLight(0xffd9a8, 26, 12, 2);
 	heroLight.position.set(0, 2.1, ROGUE_Z + 2.0); scene.add(heroLight);
 
 	/* ======================= procedural textures ======================= */
@@ -101,10 +116,12 @@ export function initDungeon3D(opts) {
 	}
 
 	/* ======================= corridor shell ======================= */
-	var wallTex = brickTex(0x1d1a28, 0x0c0a12, 0x322c44, 6, 10);
+	/* stone albedo lifted out of near-black into a saturated indigo/violet so torchlight has something
+	   vivid to catch — dark albedo stays dark no matter how bright the lights (2a polish) */
+	var wallTex = brickTex(0x2c2742, 0x16121f, 0x534873, 6, 10);
 	wallTex.repeat.set(LEN / 5, 2);
-	var floorTex = flagTex(0x17141f, 0x09080e); floorTex.repeat.set(2, LEN / 5);
-	var ceilTex = brickTex(0x141019, 0x07060b, 0x241f30, 5, 10); ceilTex.repeat.set(LEN / 6, 2);
+	var floorTex = flagTex(0x221d30, 0x100c18); floorTex.repeat.set(2, LEN / 5);
+	var ceilTex = brickTex(0x1f1a2c, 0x0c0a12, 0x3c3454, 5, 10); ceilTex.repeat.set(LEN / 6, 2);
 
 	var lambo = function (tex) { return new THREE.MeshLambertMaterial({ map: tex }); };
 
@@ -241,12 +258,158 @@ export function initDungeon3D(opts) {
 	var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ map: radialTex("rgba(255,210,150,0.9)", "rgba(255,210,150,0)"), color: 0xffcaa0, size: 0.09, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
 	scene.add(dust);
 
+	/* ======================= 2b: landmarks + clickable hotspots ======================= */
+	/* Each menu destination gets a low-poly landmark down the hall + a floating HTML pill button
+	   positioned over the landmark's projected anchor every frame. The pills are real <button>s in
+	   an overlay layer, so hotspots are keyboard-focusable and screen-reader-labelled for free —
+	   the meshes are pure eye-candy. The pills bridge to index.js via opts.onArrive(). */
+	function box(w, h, d, color, o) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), flat(color, o)); }
+	var landmarkGlowTex = radialTex("rgba(255,228,170,0.7)", "rgba(255,228,170,0)");
+	function buildChest(g) {
+		var base = box(0.7, 0.4, 0.5, 0x5b3a1e); base.position.y = 0.2; g.add(base);
+		var lid = box(0.72, 0.22, 0.52, 0x6f4d28); lid.position.y = 0.5; g.add(lid);
+		var trim = box(0.74, 0.05, 0.54, C_TRIM, { shininess: 30 }); trim.position.y = 0.4; g.add(trim);
+		var lock = box(0.12, 0.14, 0.06, C_TRIM, { shininess: 40 }); lock.position.set(0, 0.42, 0.28); g.add(lock);
+	}
+	function buildAltar(g) {
+		var ped = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.72, 6), flat(0x3a3450)); ped.position.y = 0.36; g.add(ped);
+		var top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.1, 6), flat(0x4a4163)); top.position.y = 0.74; g.add(top);
+		var pot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), flat(0x5db1e0, { emissive: 0x1f5573, shininess: 60 }));
+		pot.position.y = 0.96; pot.scale.y = 1.2; g.add(pot);
+	}
+	function buildLectern(g) {
+		var post = box(0.12, 0.9, 0.12, 0x4a4163); post.position.y = 0.45; g.add(post);
+		var desk = box(0.5, 0.06, 0.34, 0x5b3a1e); desk.position.set(0, 0.92, 0); desk.rotation.x = -0.5; g.add(desk);
+		var scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.42, 8), flat(0xe8d5a8));
+		scroll.rotation.z = Math.PI / 2; scroll.position.set(0, 1.03, 0.05); g.add(scroll);
+	}
+	function buildPortal(g) {
+		var ring = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.12, 8, 7), flat(0x4a4163, { emissive: 0x2a1f44 }));
+		ring.position.y = 1.15; g.add(ring);
+		var inner = new THREE.Mesh(new THREE.CircleGeometry(0.7, 7), new THREE.MeshBasicMaterial({ color: 0x7a4fd0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+		inner.position.set(0, 1.15, 0.02); g.add(inner);
+		g.userData.portalInner = inner;
+	}
+
+	var hsHost = (dungeon.closest && dungeon.closest(".hero")) || dungeon.parentNode;
+	/* the lower-left content card shares this coordinate space (it & the layer are both laid out in .hero);
+	   placeHotspots() keeps pills from landing behind it at narrow widths */
+	var cardEl = (hsHost && hsHost.querySelector) ? hsHost.querySelector(".char-sheet__info") : null;
+	var hsLayer = document.createElement("div");
+	hsLayer.className = "world-hotspots world-hotspots--hidden";
+	if (hsHost) hsHost.appendChild(hsLayer);
+	var hotspots = opts.hotspots || [];
+	hotspots.forEach(function (h) {
+		var g = new THREE.Group();
+		var lx = (typeof h.x === "number") ? h.x : 0;
+		g.position.set(lx, 0, h.z);
+		var labelY = 1.7;
+		if (h.kind === "chest") buildChest(g);
+		else if (h.kind === "altar") buildAltar(g);
+		else if (h.kind === "lectern") buildLectern(g);
+		else if (h.kind === "portal") { buildPortal(g); labelY = 2.55; }
+		var glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: landmarkGlowTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+		glow.position.set(0, 0.75, 0.06); g.add(glow);
+		scene.add(g);
+		h._group = g; h._anchor = new THREE.Vector3(lx, labelY, h.z);
+
+		var b = document.createElement("button");
+		b.type = "button"; b.className = "world-hotspot"; b.style.display = "none";
+		b.setAttribute("aria-label", "Travel to " + h.label);
+		b.innerHTML = '<svg class="sprite" aria-hidden="true" focusable="false"><use href="#' + h.sprite + '"/></svg><span>' + h.label + '</span>';
+		b.addEventListener("click", function (e) { e.preventDefault(); startFly(h); });
+		hsLayer.appendChild(b);
+		h._btn = b;
+	});
+
+	var _pv = new THREE.Vector3();
+	function placeHotspots() {
+		var w = dungeon.clientWidth || 300, ht = dungeon.clientHeight || 380;
+		var vis = [];
+		for (var i = 0; i < hotspots.length; i++) {
+			var hp = hotspots[i], b = hp._btn;
+			_pv.copy(hp._anchor).project(camera);
+			if (_pv.z > 1 || _pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.1 || _pv.y > 1.1) { b.style.display = "none"; continue; }
+			vis.push({ b: b, x: (_pv.x * 0.5 + 0.5) * w, y: (-_pv.y * 0.5 + 0.5) * ht });
+		}
+		/* corridor perspective bunches the deeper landmarks near the vanishing point; keep each pill
+		   over its landmark's x but spread them vertically so the labels never overlap / occlude */
+		vis.sort(function (a, b) { return a.y - b.y; });
+		var MIN = 38;
+		for (var j = 1; j < vis.length; j++) if (vis[j].y - vis[j - 1].y < MIN) vis[j].y = vis[j - 1].y + MIN;
+		/* card box in the same coord space (read once, before any writes this frame, so layout stays clean) */
+		var card = cardEl ? { l: cardEl.offsetLeft, t: cardEl.offsetTop, r: cardEl.offsetLeft + cardEl.offsetWidth, bo: cardEl.offsetTop + cardEl.offsetHeight } : null;
+		var mm;
+		for (mm = 0; mm < vis.length; mm++) vis[mm].b.style.display = "";   /* show first so widths can be measured */
+		for (mm = 0; mm < vis.length; mm++) {
+			var v = vis[mm], b = v.b;
+			var pw = b._w || (b._w = b.offsetWidth) || 90;   /* fixed labels → measure + cache once */
+			var ph = b._h || (b._h = b.offsetHeight) || 30;
+			/* keep the pill off the lower-left card: if it would overlap, push it just past the card's
+			   right edge; if it still can't fit on-screen, hide it rather than bury it behind the card */
+			if (card && v.x + pw / 2 > card.l && v.x - pw / 2 < card.r && v.y > card.t && v.y - ph < card.bo) {
+				var nx = card.r + 12 + pw / 2;
+				if (nx + pw / 2 <= w) v.x = nx; else { b.style.display = "none"; continue; }
+			}
+			b.style.left = v.x.toFixed(1) + "px";
+			b.style.top = v.y.toFixed(1) + "px";
+		}
+	}
+
+	function easeIO(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+	function startFly(h) {
+		if (!h) return;
+		if (opts.onFlyStart) opts.onFlyStart(h);   /* let the host manage focus/announce before the pill hides */
+		fromPos.copy(camera.position); fromLook.copy(lookAt);
+		var lx = h._anchor.x;
+		toPos.set(lx * 0.45, 1.5, h.z + 3.4);
+		toLook.set(lx, h.kind === "portal" ? 1.3 : 0.85, h.z);
+		tweenT = 0; tweenDur = reduceMotion ? 0.001 : 0.85; pendingArrive = h; camMode = "flying";
+		hsLayer.classList.add("world-hotspots--hidden");
+		kick();
+	}
+	function flyHome() {
+		fromPos.copy(camera.position); fromLook.copy(lookAt);
+		toPos.set(FRAME_X, CAM.y, CAM.z); toLook.copy(toPos).add(F0);
+		tweenT = 0; tweenDur = reduceMotion ? 0.001 : 0.7; pendingArrive = null; camMode = "returning";
+		kick();
+	}
+	function updateCamera(dt, time, hx) {
+		var rm = reduceMotion;
+		var sway = rm ? 0 : Math.sin(time * 0.32) * 0.22;
+		homePos.set(FRAME_X + hx * 0.22 + sway, CAM.y + (rm ? 0 : Math.sin(time * 0.5) * 0.07), CAM.z);
+		if (camMode === "home") {
+			var k = Math.min(1, dt * 5);
+			camera.position.x += (homePos.x - camera.position.x) * k;
+			camera.position.y += (homePos.y - camera.position.y) * k;
+			camera.position.z += (homePos.z - camera.position.z) * k;
+			lookAt.copy(camera.position).add(F0);
+		} else if (camMode === "flying" || camMode === "returning") {
+			tweenT += dt;
+			var e = easeIO(Math.min(1, tweenT / tweenDur));
+			camera.position.lerpVectors(fromPos, toPos, e);
+			lookAt.lerpVectors(fromLook, toLook, e);
+			if (tweenT >= tweenDur) {
+				if (camMode === "flying") {
+					camMode = "focused";
+					if (pendingArrive && opts.onArrive) { var ph = pendingArrive; pendingArrive = null; opts.onArrive(ph, ph._btn); }
+				} else { camMode = "home"; }
+			}
+		} else {   /* focused: hold the framing with a whisper of drift */
+			camera.position.copy(toPos);
+			if (!rm) camera.position.x += Math.sin(time * 0.6) * 0.02;
+			lookAt.copy(toLook);
+		}
+		camera.lookAt(lookAt);
+	}
+
 	/* ======================= input (mirrors the 2D dungeon) ======================= */
 	var WATCH = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1 };
 	var keys = {}, pointerDir = 0, heroX = 0, stepPhase = 0, dashT = 0, dashCd = 0, xp = 0;
 
 	function anyKey() { for (var k in keys) if (keys[k]) return true; return false; }
 	dungeon.addEventListener("keydown", function (e) {
+		if (camMode !== "home") return;   /* the camera is flying/focused — walk + dash are suspended */
 		if (e.code === "ShiftLeft" || e.code === "ShiftRight") { if (dashT <= 0 && dashCd <= 0) { dashT = 0.16; dashCd = 0.5; } kick(); return; }
 		if (!WATCH[e.code]) return;
 		e.preventDefault(); keys[e.code] = true; kick();
@@ -315,6 +478,7 @@ export function initDungeon3D(opts) {
 		var dn = keys.ArrowDown || keys.KeyS || pointerDir === 1;
 		var lf = keys.ArrowLeft || keys.KeyA;
 		var rt = keys.ArrowRight || keys.KeyD;
+		if (camMode !== "home") { up = dn = lf = rt = false; dashing = false; }   /* suspend walk while flying/focused */
 		if (dashing && !(up || dn || lf || rt)) up = true;   /* dash forward if nothing held */
 		var moving = up || dn || lf || rt;
 		var spd = BASE_SPD * (dashing ? DASH_MUL : 1) * dt;
@@ -338,10 +502,8 @@ export function initDungeon3D(opts) {
 		torso.rotation.z = sw * 0.05;
 		rogue.position.x += (heroX - rogue.position.x) * Math.min(1, dt * 14);
 		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
-		/* floating-camera drift — a gentle sway + bob so the view feels alive (seed of the 2a feel) */
-		var swayX = reduceMotion ? 0 : Math.sin(time * 0.32) * 0.22;
-		camera.position.x += ((heroX * 0.22 + swayX) - camera.position.x) * Math.min(1, dt * 5);
-		camera.position.y = CAM.y + (reduceMotion ? 0 : Math.sin(time * 0.5) * 0.07);
+		/* camera: 2a floating-drift while "home"; 2b click-to-fly tween while flying/focused/returning */
+		updateCamera(dt, time, heroX);
 		aura.position.x = rogue.position.x;
 		heroLight.position.x = rogue.position.x;   /* keep the hero light over the rogue as it strafes */
 		aura.material.opacity += ((dashing ? 0.85 : 0) - aura.material.opacity) * Math.min(1, dt * 12);
@@ -356,9 +518,9 @@ export function initDungeon3D(opts) {
 		   so an on-screen-but-idle visitor isn't paying full 60fps GPU cost for nothing */
 		var i, dying = false;
 		for (i = 0; i < slimes.length; i++) if (slimes[i].dyingT > 0) { dying = true; break; }
-		var settling = Math.abs(heroX - rogue.position.x) > 0.001 ||
-			Math.abs(heroX * 0.22 - camera.position.x) > 0.001 || aura.material.opacity > 0.003;
-		var activeNow = moving || dashing || settling || dying;
+		var settling = Math.abs(heroX - rogue.position.x) > 0.001 || aura.material.opacity > 0.003;
+		var camMoving = camMode === "flying" || camMode === "returning";
+		var activeNow = moving || dashing || settling || dying || camMoving;
 
 		var doRender = activeNow || dirty;
 		if (activeNow || dirty) idleAccum = 0;
@@ -405,6 +567,16 @@ export function initDungeon3D(opts) {
 				}
 			}
 
+			/* hotspots: shown only at rest in the home view (and while flying back) — never mid-walk
+			   or mid-fly-out — and re-pinned over their projected landmarks each rendered frame */
+			var showHs = (camMode === "home" || camMode === "returning") && !moving && onScreen;
+			hsLayer.classList.toggle("world-hotspots--hidden", !showHs);
+			if (showHs) placeHotspots();
+			for (i = 0; i < hotspots.length; i++) {
+				var pin = hotspots[i]._group.userData.portalInner;
+				if (pin) pin.material.opacity = 0.42 + (reduceMotion ? 0 : Math.sin(time * 2) * 0.12);
+			}
+
 			renderer.render(scene, camera);
 			dirty = false;
 		}
@@ -446,6 +618,14 @@ export function initDungeon3D(opts) {
 	sync();   /* start only if actually on-screen + tab-visible */
 
 	return {
+		/* fly the guided camera to a named hotspot (e.g. from a MENU item); on arrival the
+		   onArrive() bridge opens that section's panel. Returns the hotspot, or null. */
+		focusHotspot: function (id) {
+			for (var i = 0; i < hotspots.length; i++) if (hotspots[i].id === id) { startFly(hotspots[i]); return hotspots[i]; }
+			return null;
+		},
+		/* glide back to the home framing (e.g. when a panel closes, or for the About item) */
+		flyHome: flyHome,
 		dispose: function () {
 			disposed = true; stop();
 			if (io) io.disconnect();
@@ -453,6 +633,7 @@ export function initDungeon3D(opts) {
 			document.removeEventListener("visibilitychange", sync);
 			window.removeEventListener("keyup", onKeyUp);
 			window.removeEventListener("pointerup", onPointerUp);
+			if (hsLayer && hsLayer.parentNode) hsLayer.parentNode.removeChild(hsLayer);
 			renderer.dispose();
 		}
 	};

@@ -564,6 +564,21 @@
 		</div>
 	</div>
 
+	<!-- live region: keeps focus off <body> during a camera fly + announces the transit to AT -->
+	<p id="world-status" class="sr-only" aria-live="polite" tabindex="-1"></p>
+
+	<!-- ===== World content panel — a section lifted over the 3D world (world-on only) =====
+	     A native <dialog>: it gives us the top-layer, inert background, Esc-to-close and focus
+	     handling for free. JS MOVES the target <section> in here (and back out on close), so
+	     there's a single source of truth — ids, headings and aria survive, and crawlers still
+	     get the full semantic page on load. -->
+	<dialog id="world-panel" class="world-panel" aria-label="Section detail">
+		<div class="world-panel__frame">
+			<button class="world-panel__close" type="button" data-close aria-label="Close panel">✕ Close</button>
+			<div class="world-panel__slot"></div>
+		</div>
+	</dialog>
+
 	<!-- optional dungeon ambience: reuses the track from the original site, off by default -->
 	<audio id="ambience" loop preload="none" src="legacy/audio/music.mp3"></audio>
 

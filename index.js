@@ -5,6 +5,7 @@
 	"use strict";
 
 	var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	var world = null;   /* the 3D dungeon controller, once (and if) the WebGL world boots */
 
 	/* ---- current year ---- */
 	var yearEl = document.getElementById("year");
@@ -42,6 +43,7 @@
 		var spy = new IntersectionObserver(function (entries) {
 			entries.forEach(function (entry) {
 				if (!entry.isIntersecting) return;
+				if (entry.target.closest(".world-panel")) return;   /* ignore a section lifted into the panel (stale highlight) */
 				navLinks.forEach(function (a) {
 					var on = a.getAttribute("href") === "#" + entry.target.id;
 					a.style.color = on ? "var(--gold)" : "";
@@ -80,8 +82,12 @@
 			var item = e.target.closest(".rpg-menu__item");
 			if (!item) return;
 			var sel = item.getAttribute("data-target");
-			var dest = sel && document.querySelector(sel);
 			closeMenu(false);
+			/* world-on: fly the guided camera, then open the section as a panel over the dungeon (2b).
+			   invoker is null (the menu item is now hidden) so focus returns to the MENU button on close. */
+			if (world && worldNavigate(sel, null)) return;
+			/* fallback / non-world page: jump to the section in the scrolling document */
+			var dest = sel && document.querySelector(sel);
 			if (!dest) return;
 			dest.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 			/* hand focus to the destination heading so keyboard/screen-reader users land there */
@@ -104,6 +110,114 @@
 		});
 	}
 
+	/* ---- 2b: in-world hotspots (landmarks down the hall) + content panels over the world ----
+	   In world-on mode, MENU items and in-scene landmark pills fly the guided camera, then open
+	   the matching <section> as an overlay panel. About stays the always-on hero card (it just
+	   flies home). The same sections still scroll normally in the fallback / non-world page. */
+	/* x/z are world coords down the hall. All sit centre-to-RIGHT so their pills clear the lower-left
+	   content card, and the depths are spread so corridor perspective fans them into a clean
+	   receding line rather than a cluster at the vanishing point. */
+	var HOTSPOTS = [
+		{ id: "skills",   sel: "#skills",    label: "Skills",     sprite: "spr-potion", kind: "altar",   x: 1.85, z: -5  },
+		{ id: "projects", sel: "#quests",    label: "Projects",   sprite: "spr-chest",  kind: "chest",   x: 1.5,  z: -9  },
+		{ id: "exp",      sel: "#chronicle", label: "Experience", sprite: "spr-scroll", kind: "lectern", x: 0.8,  z: -13 },
+		{ id: "contact",  sel: "#contact",   label: "Contact",    sprite: "spr-heart",  kind: "portal",  x: 0,    z: -17.5 }
+	];
+	var TARGET_TO_HOTSPOT = { "#skills": "skills", "#quests": "projects", "#chronicle": "exp", "#contact": "contact" };
+
+	var worldPanel = document.getElementById("world-panel");
+	var panelSlot = worldPanel && worldPanel.querySelector(".world-panel__slot");
+	var canPanel = !!(worldPanel && panelSlot && typeof worldPanel.showModal === "function");
+	var panelSection = null, panelHome = null, panelInvoker = null;
+
+	function clearNavSpy() { navLinks.forEach(function (a) { a.style.color = ""; a.style.borderBottomColor = ""; }); }
+
+	/* keep keyboard/SR focus off <body> during the camera fly, and announce the move */
+	function announceTransit(label) {
+		var s = document.getElementById("world-status");
+		if (!s) return;
+		s.textContent = label ? ("Traveling to " + label + "…") : "";
+		try { s.focus({ preventScroll: true }); } catch (e) { /* non-focusable in old engines — ignore */ }
+	}
+
+	/* MOVE (not clone) the section into the dialog so ids / headings / aria survive and there's a
+	   single source of truth; crawlers still get the full page on load since this only runs on click. */
+	function openPanel(sel, invoker) {
+		var section = document.querySelector(sel);
+		if (!section) return;
+		if (!canPanel) { section.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" }); return; }
+		if (panelSection) return;   /* one panel at a time */
+		panelInvoker = invoker || null;
+		panelHome = document.createComment("panel-anchor");
+		section.parentNode.insertBefore(panelHome, section);
+		panelSlot.appendChild(section);
+		section.classList.add("is-paneled");
+		panelSection = section;
+		/* label the native <dialog> by the lifted section's heading (no nested dialog roles) */
+		var heading = section.querySelector("h2, h3, h1");
+		if (heading && heading.id) worldPanel.setAttribute("aria-labelledby", heading.id);
+		document.body.classList.add("panel-open");
+		worldPanel.showModal();
+		panelSlot.scrollTop = 0;
+		if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+	}
+
+	if (canPanel) {
+		/* close on the ✕ button, on a click in the dialog margin (outside the frame), and on Esc (native) */
+		worldPanel.addEventListener("click", function (e) {
+			if (e.target.closest("[data-close]") || e.target === worldPanel) worldPanel.close();
+		});
+		worldPanel.addEventListener("close", function () {
+			var section = panelSection;
+			if (section) {
+				if (panelHome && panelHome.parentNode) { panelHome.parentNode.insertBefore(section, panelHome); panelHome.parentNode.removeChild(panelHome); }
+				section.classList.remove("is-paneled");
+			}
+			worldPanel.removeAttribute("aria-labelledby");
+			panelSection = null; panelHome = null;
+			document.body.classList.remove("panel-open");
+			clearNavSpy();   /* drop any stale highlight the lifted section left on the HUD nav */
+			var statusEl = document.getElementById("world-status"); if (statusEl) statusEl.textContent = "";
+			if (world && world.flyHome) world.flyHome();
+			/* return focus to the opener if it's a still-visible control (a HUD/CTA anchor), else the MENU
+			   button — a hotspot pill is hidden during the return fly (offsetParent stays set under
+			   visibility:hidden, so also reject anything inside the hidden hotspot layer) */
+			var inv = panelInvoker; panelInvoker = null;
+			function focusable(el) { return el && el.isConnected && el.offsetParent !== null && !(el.closest && el.closest(".world-hotspots--hidden")); }
+			var mb = document.getElementById("menu-btn");
+			if (focusable(inv)) inv.focus(); else if (mb) mb.focus();
+		});
+	}
+
+	/* world-on routing shared by the MENU, the HUD nav, the hero CTAs and the DESCEND hint: fly the
+	   guided camera + open the section as a panel. Returns true when it handled the navigation. */
+	function worldNavigate(sel, invoker) {
+		if (!world) return false;
+		if (sel === "#top") {   /* About == the always-on hero card; just glide home + focus it */
+			if (world.flyHome) world.flyHome();
+			var card = document.querySelector(".char-sheet__name");
+			if (card) { card.setAttribute("tabindex", "-1"); card.focus({ preventScroll: true }); }
+			return true;
+		}
+		if (!canPanel) return false;   /* panels unusable → let the anchor scroll natively (avoids a fly lockup) */
+		var hid = TARGET_TO_HOTSPOT[sel];
+		if (hid && world.focusHotspot) { world.focusHotspot(hid); return true; }   /* fly → onArrive opens the panel */
+		openPanel(sel, invoker);
+		return true;
+	}
+
+	/* the HUD nav links, the hero CTAs and the DESCEND hint are plain in-document anchors; in world-on
+	   route them through the same fly + panel flow as the MENU instead of scrolling into the raw sections
+	   below the immersive hero. The fallback / non-world page (world === null) keeps native anchor scrolling. */
+	document.addEventListener("click", function (e) {
+		if (!world) return;
+		var a = e.target.closest(".hud__nav a, .hero__cta a.btn, a.scroll-hint");
+		if (!a) return;
+		var href = a.getAttribute("href");
+		if (!href || href.charAt(0) !== "#") return;
+		if (href === "#top" || TARGET_TO_HOTSPOT[href]) { e.preventDefault(); worldNavigate(href, a); }
+	});
+
 	/* ---- mini-dungeon: real-3D (Three.js) when supported, hand-rolled 2.5D otherwise ---- */
 	var dungeon = document.getElementById("dungeon");
 	var heroEl = document.getElementById("hero-rogue");
@@ -116,16 +230,32 @@
 			return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
 		} catch (e) { return false; }
 	}
-	/* skip the 670 KB 3D download for reduced-motion, data-saver, or no-WebGL visitors */
+	/* skip the 670 KB 3D download for reduced-motion, data-saver, or no-WebGL visitors — and reserve the
+	   full-viewport world for desktop-width screens (mobile/narrow get the boxed page + menu, by design;
+	   the lower-left card + framed rogue + hotspot pills need the room) */
 	var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
-	var prefer3D = !reduceMotion && !conn.saveData && webglSupported();
+	var wideEnough = !window.matchMedia || window.matchMedia("(min-width: 960px)").matches;
+	var prefer3D = !reduceMotion && !conn.saveData && wideEnough && webglSupported();
 
 	if (dungeon && heroEl && scene) {
 		var glCanvas = dungeon.querySelector(".dungeon__gl");
 		if (prefer3D && glCanvas) {
 			import("./dungeon3d.js")
-				.then(function (m) { return m.initDungeon3D({ dungeon: dungeon, canvas: glCanvas, xpEl: xpEl, reduceMotion: reduceMotion }); })
-				.then(function () { document.body.classList.add("world-on"); })   /* promote the hero to a full-viewport world */
+				.then(function (m) {
+					return m.initDungeon3D({
+						dungeon: dungeon, canvas: glCanvas, xpEl: xpEl, reduceMotion: reduceMotion,
+						/* no usable <dialog> ⇒ no panels ⇒ build no hotspots/fly path (avoids a focused-camera lockup) */
+						hotspots: canPanel ? HOTSPOTS : [],
+						onFlyStart: function (h) { announceTransit(h && h.label); },   /* keep focus off <body> during the fly */
+						onArrive: function (h, btn) { openPanel(h.sel, btn); }          /* fly completes → open that section's panel */
+					});
+				})
+				.then(function (ctrl) {
+					world = ctrl; document.body.classList.add("world-on");   /* promote the hero to a full-viewport world */
+					/* the boxed-dungeon label promised click-to-walk + dash; in world-on clicking is inert and walking
+					   is suspended during flights, so describe the actual controls (Tab + arrows, MENU/landmarks) */
+					dungeon.setAttribute("aria-label", "Mini-dungeon — press Tab to focus, then arrow keys (or W A S D) to walk the rogue down the hall; or use the MENU or the glowing landmarks to travel to a section.");
+				})
 				.catch(function (err) { if (window.console && console.warn) { console.warn("3D dungeon unavailable — using 2.5D fallback.", err); } start2DDungeon(); });
 		} else {
 			start2DDungeon();
