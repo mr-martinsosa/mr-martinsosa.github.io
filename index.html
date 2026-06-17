@@ -202,6 +202,7 @@
 			<div class="char-sheet panel">
 				<div class="char-sheet__portrait">
 					<div id="dungeon" class="dungeon" tabindex="0" role="application" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift" aria-label="Mini-dungeon — click or focus, then use the arrow keys (or W A S D) to walk the rogue down the hall. Press Shift to dash.">
+						<canvas class="dungeon__gl" aria-hidden="true"></canvas>
 						<div class="dungeon__scene" aria-hidden="true"></div>
 						<div class="dungeon__slimes" aria-hidden="true"></div>
 						<div id="hero-rogue" class="dungeon__hero" aria-hidden="true"></div>
@@ -538,7 +539,7 @@
 	<footer class="foot">
 		<p class="foot__line">
 			<span class="foot__glyph" aria-hidden="true">@</span>
-			Hand-built from scratch, no frameworks.
+			Hand-built from scratch in vanilla JS — plus Three.js for the 3D dungeon.
 		</p>
 		<p class="foot__line foot__line--dim">© <span id="year">2026</span> Martin Sosa · New York, NY · <span class="foot__hint">try the ↑↑↓↓←→←→BA</span></p>
 	</footer>

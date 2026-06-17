@@ -52,11 +52,34 @@
 		sections.forEach(function (s) { spy.observe(s); });
 	}
 
-	/* ---- playable mini-dungeon: click in, then walk the hall with the arrow keys ---- */
+	/* ---- mini-dungeon: real-3D (Three.js) when supported, hand-rolled 2.5D otherwise ---- */
 	var dungeon = document.getElementById("dungeon");
 	var heroEl = document.getElementById("hero-rogue");
 	var scene = dungeon && dungeon.querySelector(".dungeon__scene");
+	var xpEl = dungeon && dungeon.querySelector(".dungeon__xp");
+
+	function webglSupported() {
+		try {
+			var c = document.createElement("canvas");
+			return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
+		} catch (e) { return false; }
+	}
+	/* skip the 670 KB 3D download for reduced-motion, data-saver, or no-WebGL visitors */
+	var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+	var prefer3D = !reduceMotion && !conn.saveData && webglSupported();
+
 	if (dungeon && heroEl && scene) {
+		var glCanvas = dungeon.querySelector(".dungeon__gl");
+		if (prefer3D && glCanvas) {
+			import("./dungeon3d.js")
+				.then(function (m) { return m.initDungeon3D({ dungeon: dungeon, canvas: glCanvas, xpEl: xpEl, reduceMotion: reduceMotion }); })
+				.catch(function (err) { if (window.console && console.warn) { console.warn("3D dungeon unavailable — using 2.5D fallback.", err); } start2DDungeon(); });
+		} else {
+			start2DDungeon();
+		}
+	}
+
+	function start2DDungeon() {
 		var WATCH = { ArrowUp:1, ArrowDown:1, ArrowLeft:1, ArrowRight:1, KeyW:1, KeyA:1, KeyS:1, KeyD:1 };
 		var keys = {}, pointerDir = 0;     /* pointerDir: -1 forward, 1 back, 0 idle */
 		var offset = 0, heroX = 0, stepPhase = 0, raf = 0, dashT = 0, dashCd = 0;
