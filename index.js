@@ -1,156 +1,203 @@
-/* Used this codepen with some color and screen adjustment: https://codepen.io/nashvail/pen/wpGgXO */
+/* =====================================================================
+   Martin Sosa — dungeon portfolio behaviour. Vanilla JS, no deps.
+   ===================================================================== */
+(function () {
+	"use strict";
 
-// Some random colors
-const colors = ["#ffccdd", "#514F59", "#5941A9", "#6D72C3", "#FFFFFF"];
+	var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const numBalls = 50;
-const balls = [];
+	/* ---- current year ---- */
+	var yearEl = document.getElementById("year");
+	if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
-for (let i = 0; i < numBalls; i++) {
-  let ball = document.createElement("div");
-  ball.classList.add("ball");
-  ball.style.background = colors[Math.floor(Math.random() * colors.length)];
-  ball.style.left = `${Math.floor(Math.random() * 90)}vw`;
-  ball.style.top = `${Math.floor(Math.random() * 75)}vh`;
-  ball.style.transform = `scale(${Math.random()})`;
-  ball.style.width = `${Math.random()}em`;
-  ball.style.height = ball.style.width;
-  
-  balls.push(ball);
-  document.body.append(ball);
-}
+	/* ---- dungeon ambience toggle (off by default, user-initiated) ---- */
+	var audio = document.getElementById("ambience");
+	var toggle = document.getElementById("audio-toggle");
+	if (audio && toggle) {
+		audio.volume = 0.18;
+		var stateEl = toggle.querySelector(".hud__audio-state");
+		toggle.addEventListener("click", function () {
+			if (audio.paused) {
+				var p = audio.play();
+				if (p && p.catch) p.catch(function () { /* autoplay blocked until gesture — this IS the gesture, ignore */ });
+				toggle.setAttribute("aria-pressed", "true");
+				toggle.setAttribute("aria-label", "Toggle dungeon ambience (on)");
+				if (stateEl) stateEl.textContent = "ON";
+			} else {
+				audio.pause();
+				toggle.setAttribute("aria-pressed", "false");
+				toggle.setAttribute("aria-label", "Toggle dungeon ambience (off)");
+				if (stateEl) stateEl.textContent = "OFF";
+			}
+		});
+	}
 
-// Keyframes
-balls.forEach((el, i, ra) => {
-  let to = {
-    x: Math.random() * (i % 2 === 0 ? -11 : 11),
-    y: Math.random() * 12
-  };
+	/* ---- active section highlighting in the HUD ---- */
+	var navLinks = Array.prototype.slice.call(document.querySelectorAll(".hud__nav a"));
+	var sections = navLinks
+		.map(function (a) { return document.querySelector(a.getAttribute("href")); })
+		.filter(Boolean);
 
-  let anim = el.animate(
-    [
-      { transform: "translate(0, 0)" },
-      { transform: `translate(${to.x}rem, ${to.y}rem)` }
-    ],
-    {
-      duration: (Math.random() + 1) * 2000, // random duration
-      direction: "alternate",
-      fill: "both",
-      iterations: Infinity,
-      easing: "ease-in-out"
-    }
-  );
-});
+	if ("IntersectionObserver" in window && sections.length) {
+		var spy = new IntersectionObserver(function (entries) {
+			entries.forEach(function (entry) {
+				if (!entry.isIntersecting) return;
+				navLinks.forEach(function (a) {
+					var on = a.getAttribute("href") === "#" + entry.target.id;
+					a.style.color = on ? "var(--gold)" : "";
+					a.style.borderBottomColor = on ? "var(--gold-deep)" : "";
+				});
+			});
+		}, { rootMargin: "-45% 0px -50% 0px" });
+		sections.forEach(function (s) { spy.observe(s); });
+	}
 
+	/* ---- playable mini-dungeon: click in, then walk the hall with the arrow keys ---- */
+	var dungeon = document.getElementById("dungeon");
+	var heroEl = document.getElementById("hero-rogue");
+	var scene = dungeon && dungeon.querySelector(".dungeon__scene");
+	if (dungeon && heroEl && scene) {
+		var WATCH = { ArrowUp:1, ArrowDown:1, ArrowLeft:1, ArrowRight:1, KeyW:1, KeyA:1, KeyS:1, KeyD:1 };
+		var keys = {}, pointerDir = 0;     /* pointerDir: -1 forward, 1 back, 0 idle */
+		var offset = 0, heroX = 0, stepPhase = 0, raf = 0, dashT = 0, dashCd = 0;
+		var SPEED = 1.7, MAXX = 64;
+		var slimeLayer = dungeon.querySelector(".dungeon__slimes");
+		var xpEl = dungeon.querySelector(".dungeon__xp");
+		var SVGNS = "http://www.w3.org/2000/svg", slimes = [], xp = 0;
 
-//onclick button zoom out
-let zoomOutIndex = document.querySelector(".index-button")
-let zoomOutProject = document.querySelector(".project-button")
-let zoomOutContact = document.querySelector(".contact-button")
+		function dim() { return { w: dungeon.clientWidth || 200, h: dungeon.clientHeight || 260 }; }
+		function spawnAhead(s) {
+			var d = dim();
+			s.wy = offset + d.h * 0.6 + Math.random() * d.h * 1.2;   /* place it up the hall, ahead of you */
+			s.wx = Math.round((Math.random() * 2 - 1) * MAXX);
+			s.alive = true; s.el.classList.remove("dead");
+		}
+		function makeSlimes() {
+			if (!slimeLayer || slimes.length) return;
+			var d = dim();
+			for (var i = 0; i < 5; i++) {
+				var svg = document.createElementNS(SVGNS, "svg"), use = document.createElementNS(SVGNS, "use");
+				svg.setAttribute("class", "dslime"); use.setAttribute("href", "#spr-slime");
+				svg.appendChild(use); slimeLayer.appendChild(svg);
+				var s = { el: svg, alive: true, wx: 0, wy: 0 };
+				spawnAhead(s);
+				s.wy = offset + (i + 1) * (d.h / 5) + Math.random() * 24;   /* spread the first few into view */
+				slimes.push(s);
+			}
+		}
+		function popXP(x, y) {
+			var p = document.createElement("div");
+			p.className = "xp-pop"; p.textContent = "+1 XP";
+			p.style.left = x + "px"; p.style.top = y + "px";
+			dungeon.appendChild(p);
+			p.addEventListener("animationend", function () { p.remove(); });
+			xp++; if (xpEl) xpEl.textContent = "✦ " + xp;
+		}
+		function updateSlimes(dashing) {
+			if (!slimes.length) return;
+			var d = dim(), cx = d.w / 2, cy = d.h * 0.52, i, s, sy;
+			for (i = 0; i < slimes.length; i++) {
+				s = slimes[i];
+				if (!s.alive) continue;
+				sy = cy + (offset - s.wy);
+				if (sy > d.h + 30 || sy < -40) { spawnAhead(s); continue; }   /* off-screen -> recycle ahead */
+				s.el.style.left = (cx + s.wx - 9) + "px";
+				s.el.style.top = (sy - 9) + "px";
+				if (dashing && Math.abs(s.wx - heroX) < 15 && Math.abs(offset - s.wy) < 17) {
+					s.alive = false; s.el.classList.add("dead");
+					popXP(cx + s.wx, sy);
+					(function (sl) { setTimeout(function () { spawnAhead(sl); }, 380); })(s);
+				}
+			}
+		}
 
-let zoomOutIndexButton = document.querySelector("#index-button")
-let zoomOutProjectButton = document.querySelector("#project-button")
-let zoomOutContactButton = document.querySelector("#contact-button")
+		function anyKey() {
+			for (var k in keys) if (keys[k]) return true;
+			return false;
+		}
+		function running() {
+			return dashT > 0 || (document.activeElement === dungeon && anyKey()) || pointerDir !== 0;
+		}
 
-let indexNav = document.querySelector("#index-nav")
-let projectNav = document.querySelector("#project-nav")
-let contactNav = document.querySelector("#contact-nav")
+		function frame() {
+			var dashing = dashT > 0;
+			if (dashT > 0) dashT--;
+			if (dashCd > 0) dashCd--;
+			var spd = SPEED * (dashing ? 3.2 : 1);
 
-let index = document.querySelector("#index")
-let projects = document.querySelector("#projects")
-let contact = document.querySelector("#contact")
+			var up = keys.ArrowUp || keys.KeyW || pointerDir === -1;
+			var dn = keys.ArrowDown || keys.KeyS || pointerDir === 1;
+			var lf = keys.ArrowLeft || keys.KeyA;
+			var rt = keys.ArrowRight || keys.KeyD;
+			if (dashing && !(up || dn || lf || rt)) up = true;     /* dash forward if no direction held */
+			var moving = up || dn || lf || rt;
+			var pos = "0% 0%", flip = false;   /* default: face front (resting) */
 
-zoomOutIndex.addEventListener("click", (event) => {
-    index.classList.remove("scale-in")
-    index.classList.add("scale-away")
-    
-    contact.classList.remove("scale-in")
-    contact.classList.add("scale-away")
+			if (up) { offset += spd; pos = "100% 0%"; }            /* forward -> back of head */
+			else if (dn) { offset -= spd; pos = "0% 0%"; }         /* backward -> face viewer */
+			if (rt) { heroX = Math.min(MAXX, heroX + spd); if (!up && !dn) pos = "50% 0%"; }
+			if (lf) { heroX = Math.max(-MAXX, heroX - spd); if (!up && !dn) { pos = "50% 0%"; flip = true; } }
 
-    projects.classList.remove("hidden")
-    projects.classList.add("scale-in")
+			if (moving) stepPhase = (stepPhase + (dashing ? 0.6 : 0.35)) % (Math.PI * 2);
+			var bob = (moving && !reduceMotion && Math.sin(stepPhase) < 0) ? -2 : 0;
 
-    indexNav.classList.remove("active")
-    projectNav.classList.add("active")
-    contactNav.classList.remove("active")
-})
+			scene.style.backgroundPositionY = offset.toFixed(1) + "px";
+			heroEl.style.backgroundPosition = pos;
+			heroEl.style.transform = "translate(" + heroX.toFixed(1) + "px," + bob + "px) scaleX(" + (flip ? -1 : 1) + ")";
+			heroEl.style.filter = dashing ? "drop-shadow(0 3px 3px rgba(0,0,0,.7)) drop-shadow(0 0 7px rgba(255,138,61,.75))" : "";
+			dungeon.classList.toggle("is-playing", moving);
+			updateSlimes(dashing);
 
-zoomOutIndexButton.addEventListener("click", (event) => {
-    index.classList.remove("scale-in")
-    index.classList.add("scale-away")
-    
-    contact.classList.remove("scale-in")
-    contact.classList.add("scale-away")
+			if (running()) raf = requestAnimationFrame(frame);
+			else { raf = 0; dashCd = 0; dungeon.classList.remove("is-playing"); }
+		}
+		function ensureLoop() { if (!raf) raf = requestAnimationFrame(frame); }
 
-    projects.classList.remove("hidden")
-    projects.classList.add("scale-in")
+		dungeon.addEventListener("keydown", function (e) {
+			if (e.code === "ShiftLeft" || e.code === "ShiftRight") {   /* small dash, with cooldown */
+				if (dashT <= 0 && dashCd <= 0) { dashT = 9; dashCd = 28; }
+				ensureLoop(); return;
+			}
+			if (!WATCH[e.code]) return;
+			e.preventDefault();            /* keep arrows from scrolling the page while playing */
+			keys[e.code] = true; ensureLoop();
+		});
+		window.addEventListener("keyup", function (e) { if (WATCH[e.code]) keys[e.code] = false; });
+		dungeon.addEventListener("blur", function () { keys = {}; pointerDir = 0; });
 
-    indexNav.classList.remove("active")
-    projectNav.classList.add("active")
-    contactNav.classList.remove("active")    
-})
+		/* press-and-hold to walk (touch + mouse): top half = forward, bottom half = back */
+		function pdir(e) {
+			var r = dungeon.getBoundingClientRect();
+			var cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+			return cy < r.height / 2 ? -1 : 1;
+		}
+		dungeon.addEventListener("pointerdown", function (e) { dungeon.focus({ preventScroll: true }); pointerDir = pdir(e); ensureLoop(); });
+		dungeon.addEventListener("pointermove", function (e) { if (pointerDir !== 0) pointerDir = pdir(e); });
+		window.addEventListener("pointerup", function () { pointerDir = 0; });
+		dungeon.addEventListener("pointercancel", function () { pointerDir = 0; });
 
-zoomOutProject.addEventListener("click", (event) => {
-    projects.classList.remove("scale-in")
-    projects.classList.add("scale-away")
+		makeSlimes(); updateSlimes(false);
+	}
 
-    index.classList.remove("scale-in")
-    index.classList.add("scale-away")
+	/* (slimes now live inside the mini-dungeon — dash through them; see updateSlimes above) */
 
-    contact.classList.remove("hidden")
-    contact.classList.add("scale-in")
+	/* ---- Konami code: ↑↑↓↓←→←→ B A → torchlight surges ---- */
+	var KONAMI = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
+	var streak = 0;
+	document.addEventListener("keydown", function (e) {
+		streak = (e.keyCode === KONAMI[streak]) ? streak + 1 : (e.keyCode === KONAMI[0] ? 1 : 0);
+		if (streak === KONAMI.length) {
+			streak = 0;
+			document.body.classList.add("konami");
+			document.documentElement.style.setProperty("--torch", "#ff8fd6");
+			document.documentElement.style.setProperty("--gold", "#ffa6e6");
+			document.documentElement.style.setProperty("--gold-deep", "#c95fa8");
+			document.documentElement.style.setProperty("--gold-soft", "#ffd0f1");
+			console.log("%c  CHEAT ENABLED — the dungeon glows pink. ", "background:#ffa6e6;color:#0b0a10;font-weight:bold;padding:2px 6px;");
+		}
+	});
 
-    indexNav.classList.remove("active")
-    projectNav.classList.remove("active")
-    contactNav.classList.add("active")
-})
-
-zoomOutProjectButton.addEventListener("click", (event) => {
-    projects.classList.remove("scale-in")
-    projects.classList.add("scale-away")
-
-    index.classList.remove("scale-in")
-    index.classList.add("scale-away")
-
-    contact.classList.remove("hidden")
-    contact.classList.add("scale-in")
-    
-    indexNav.classList.remove("active")
-    projectNav.classList.remove("active")
-    contactNav.classList.add("active")
-})
-
-zoomOutContact.addEventListener("click", (event) => {
-    contact.classList.remove("scale-in")
-    contact.classList.add("scale-away")
-
-    projects.classList.remove("scale-in")
-    projects.classList.add("scale-away")
-
-    index.classList.remove("scale-away")
-    index.classList.add("scale-in")
-
-    indexNav.classList.add("active")
-    projectNav.classList.remove("active")
-    contactNav.classList.remove("active")
-})
-
-zoomOutContactButton.addEventListener("click", (event) => {
-    contact.classList.remove("scale-in")
-    contact.classList.add("scale-away")
-
-    projects.classList.remove("scale-in")
-    projects.classList.add("scale-away")
-
-    index.classList.remove("scale-away")
-    index.classList.add("scale-in")
-
-    indexNav.classList.add("active")
-    projectNav.classList.remove("active")
-    contactNav.classList.remove("active")
-})
-
-// Set bg music low to not bother everyone :)
-let bg = document.getElementById("music")
-bg.volume = 0.2
-bg.play()
+	/* ---- a friendly note for the curious ---- */
+	console.log("%c@ Martin Sosa", "color:#e8c170;font-size:20px;font-weight:bold;");
+	console.log("%cFull-Stack Software Engineer · poking around the source? Say hi: mr.martinsosa@gmail.com", "color:#9a92ac;");
+})();

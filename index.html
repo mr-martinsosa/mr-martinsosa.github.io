@@ -1,92 +1,553 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-	<head>
-		<!-- Required meta tags -->
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-		<meta name="description" content="Martin Sosa's personal site which shows the various projects he has worked on.">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-		<!-- Bootstrap CSS -->
-		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+	<title>Martin Sosa — Full-Stack Software Engineer</title>
+	<meta name="description" content="Martin Sosa — Full-Stack Software Engineer in New York with a focus on AI integration. React 19/TypeScript, Node.js/PostgreSQL, and LLM APIs behind real guardrails. Enter the dungeon.">
+	<meta name="author" content="Martin Sosa">
+	<meta name="theme-color" content="#0b0a10">
+	<link rel="canonical" href="https://mr-martinsosa.github.io/">
 
-		<!-- Index CSS-->
-		<link href="https://fonts.googleapis.com/css?family=Dosis" rel="stylesheet">
-		<link rel="stylesheet" href="index.css">
-		<title>Martin Sosa</title>
-	</head>
+	<!-- Open Graph / Twitter -->
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="Martin Sosa — Full-Stack Software Engineer">
+	<meta property="og:description" content="A dungeon-crawl portfolio. React 19/TypeScript, Node.js/PostgreSQL, and AI integration behind real guardrails. Enter the dungeon.">
+	<meta property="og:url" content="https://mr-martinsosa.github.io/">
+	<meta property="og:image" content="https://mr-martinsosa.github.io/og.png">
+	<meta property="og:image:type" content="image/png">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:alt" content="Martin Sosa — Full-Stack Software Engineer">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Martin Sosa — Full-Stack Software Engineer">
+	<meta name="twitter:description" content="A dungeon-crawl portfolio. React 19/TypeScript, Node.js/PostgreSQL, and AI integration behind real guardrails.">
+	<meta name="twitter:image" content="https://mr-martinsosa.github.io/og.png">
 
-	<body class="text-center">
+	<!-- Favicon: pixel sword, inline so there's no extra request -->
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%230b0a10'/%3E%3Crect x='7' y='1' width='2' height='9' fill='%23cfd6e6'/%3E%3Crect x='6' y='2' width='1' height='7' fill='%238b93a7'/%3E%3Crect x='9' y='2' width='1' height='7' fill='%23eef2fb'/%3E%3Crect x='4' y='10' width='8' height='1' fill='%23e8c170'/%3E%3Crect x='7' y='11' width='2' height='3' fill='%23b88a36'/%3E%3Crect x='6' y='14' width='4' height='1' fill='%23e8c170'/%3E%3C/svg%3E">
 
-			<div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
-				<header class="masthead mb-auto">
-					<div class="inner">
-						<h3 class="masthead-brand">Martin Sosa</h3>
-						<nav id = "nav-font" class="nav nav-masthead justify-content-center">
-							<a id = "index-nav" class="nav-link active contact-button">Home</a>
-							<a id = "project-nav" class="nav-link index-button">Projects</a>
-							<a id = "contact-nav" class="nav-link project-button">Contact</a>
-						</nav>
+	<!-- Fonts: pixel display + readable terminal body -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" href="index.css">
+
+	<!-- Person schema for search engines -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "Person",
+		"name": "Martin Sosa",
+		"jobTitle": "Full-Stack Software Engineer",
+		"description": "Full-stack software engineer with a focus on AI integration.",
+		"email": "mailto:mr.martinsosa@gmail.com",
+		"address": { "@type": "PostalAddress", "addressLocality": "New York", "addressRegion": "NY" },
+		"url": "https://mr-martinsosa.github.io/",
+		"sameAs": [
+			"https://github.com/mr-martinsosa",
+			"https://www.linkedin.com/in/mr-martinsosa",
+			"https://about.me/martin.sosa"
+		],
+		"knowsAbout": ["TypeScript", "React", "Node.js", "PostgreSQL", "Python", "LLM integration", "AI engineering"]
+	}
+	</script>
+</head>
+
+<body>
+	<a class="skip-link" href="#main">Skip to content</a>
+
+	<!-- ===== Reusable pixel sprites (inline SVG symbol sheet) ===== -->
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+		<defs>
+			<symbol id="spr-torch" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="7" y="8" width="2" height="7" fill="#5b3a1e"/>
+					<rect x="6" y="9" width="1" height="6" fill="#3f2814"/>
+					<rect x="9" y="9" width="1" height="6" fill="#7a4f29"/>
+					<rect x="6" y="7" width="4" height="2" fill="#8a8597"/>
+					<g class="flame">
+						<rect x="6" y="3" width="4" height="4" fill="#ff8a3d"/>
+						<rect x="7" y="1" width="2" height="2" fill="#ffd166"/>
+						<rect x="7" y="3" width="2" height="3" fill="#ffe39a"/>
+						<rect x="5" y="4" width="1" height="2" fill="#d65a1f"/>
+						<rect x="10" y="4" width="1" height="2" fill="#d65a1f"/>
+					</g>
+				</g>
+			</symbol>
+
+			<symbol id="spr-slime" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="3" y="9" width="10" height="5" fill="#6ab04c"/>
+					<rect x="4" y="7" width="8" height="2" fill="#7bc96f"/>
+					<rect x="5" y="6" width="6" height="1" fill="#8fe07f"/>
+					<rect x="3" y="14" width="10" height="1" fill="#3f7a2c"/>
+					<rect x="5" y="9" width="2" height="2" fill="#0b0a10"/>
+					<rect x="9" y="9" width="2" height="2" fill="#0b0a10"/>
+					<rect x="5" y="9" width="1" height="1" fill="#eef2fb"/>
+					<rect x="9" y="9" width="1" height="1" fill="#eef2fb"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-chest" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="2" y="7" width="12" height="7" fill="#7a4f29"/>
+					<rect x="2" y="4" width="12" height="4" fill="#8a5a30"/>
+					<rect x="2" y="6" width="12" height="1" fill="#5b3a1e"/>
+					<rect x="2" y="4" width="12" height="1" fill="#e8c170"/>
+					<rect x="2" y="13" width="12" height="1" fill="#5b3a1e"/>
+					<rect x="7" y="6" width="2" height="4" fill="#e8c170"/>
+					<rect x="7" y="8" width="2" height="1" fill="#b88a36"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-coin" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="5" y="3" width="6" height="10" fill="#e8c170"/>
+					<rect x="4" y="4" width="1" height="8" fill="#b88a36"/>
+					<rect x="11" y="4" width="1" height="8" fill="#b88a36"/>
+					<rect x="7" y="5" width="2" height="6" fill="#fff0c2"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-heart" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="3" y="4" width="3" height="2" fill="#d6584e"/>
+					<rect x="10" y="4" width="3" height="2" fill="#d6584e"/>
+					<rect x="2" y="6" width="12" height="3" fill="#d6584e"/>
+					<rect x="3" y="9" width="10" height="2" fill="#9c2f2c"/>
+					<rect x="5" y="11" width="6" height="2" fill="#9c2f2c"/>
+					<rect x="7" y="13" width="2" height="1" fill="#9c2f2c"/>
+					<rect x="4" y="5" width="2" height="1" fill="#ff9b8f"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-potion" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="6" y="2" width="4" height="2" fill="#8a8597"/>
+					<rect x="7" y="4" width="2" height="2" fill="#cfd6e6"/>
+					<rect x="5" y="6" width="6" height="7" fill="#5db1e0"/>
+					<rect x="5" y="13" width="6" height="1" fill="#2f6f93"/>
+					<rect x="6" y="8" width="2" height="3" fill="#bfe6fb"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-lock" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="5" y="2" width="6" height="2" fill="#8a8597"/>
+					<rect x="4" y="3" width="1" height="4" fill="#8a8597"/>
+					<rect x="11" y="3" width="1" height="4" fill="#8a8597"/>
+					<rect x="3" y="7" width="10" height="7" fill="#e8c170"/>
+					<rect x="3" y="7" width="10" height="1" fill="#fff0c2"/>
+					<rect x="3" y="13" width="10" height="1" fill="#b88a36"/>
+					<rect x="7" y="9" width="2" height="3" fill="#5b3a1e"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-scroll" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="3" y="2" width="10" height="12" fill="#e8d5a8"/>
+					<rect x="3" y="2" width="10" height="2" fill="#cdb784"/>
+					<rect x="3" y="12" width="10" height="2" fill="#cdb784"/>
+					<rect x="5" y="5" width="6" height="1" fill="#8a6f3a"/>
+					<rect x="5" y="7" width="6" height="1" fill="#8a6f3a"/>
+					<rect x="5" y="9" width="4" height="1" fill="#8a6f3a"/>
+				</g>
+			</symbol>
+
+			<symbol id="spr-sword" viewBox="0 0 16 16">
+				<g shape-rendering="crispEdges">
+					<rect x="7" y="1" width="2" height="9" fill="#cfd6e6"/>
+					<rect x="9" y="2" width="1" height="7" fill="#eef2fb"/>
+					<rect x="6" y="2" width="1" height="7" fill="#8b93a7"/>
+					<rect x="4" y="10" width="8" height="1" fill="#e8c170"/>
+					<rect x="7" y="11" width="2" height="3" fill="#b88a36"/>
+					<rect x="6" y="14" width="4" height="1" fill="#e8c170"/>
+				</g>
+			</symbol>
+		</defs>
+	</svg>
+
+	<!-- atmosphere overlays (decorative) -->
+	<div class="fx-vignette" aria-hidden="true"></div>
+	<div class="fx-scanlines" aria-hidden="true"></div>
+
+	<!-- ===== HUD / top bar ===== -->
+	<header class="hud">
+		<a class="hud__brand" href="#top" aria-label="Martin Sosa — home">
+			<span class="hud__glyph" aria-hidden="true">@</span>
+			<span class="hud__name">MARTIN SOSA</span>
+		</a>
+		<nav class="hud__nav" aria-label="Primary">
+			<a href="#skills">Skills</a>
+			<a href="#quests">Quests</a>
+			<a href="#chronicle">Chronicle</a>
+			<a href="#contact">Contact</a>
+		</nav>
+		<button id="audio-toggle" class="hud__audio" type="button" aria-pressed="false" aria-label="Toggle dungeon ambience (off)" title="Dungeon ambience">
+			<span class="hud__audio-ico" aria-hidden="true">♪</span>
+			<span class="hud__audio-state" aria-hidden="true">OFF</span>
+		</button>
+	</header>
+
+	<main id="main">
+		<span id="top"></span>
+
+		<!-- ===== HERO / CHARACTER ===== -->
+		<section class="hero" aria-labelledby="hero-name">
+			<div class="hero__sky" aria-hidden="true"></div>
+
+			<div class="char-sheet panel">
+				<div class="char-sheet__portrait">
+					<div id="dungeon" class="dungeon" tabindex="0" role="application" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift" aria-label="Mini-dungeon — click or focus, then use the arrow keys (or W A S D) to walk the rogue down the hall. Press Shift to dash.">
+						<div class="dungeon__scene" aria-hidden="true"></div>
+						<div class="dungeon__slimes" aria-hidden="true"></div>
+						<div id="hero-rogue" class="dungeon__hero" aria-hidden="true"></div>
+						<div class="dungeon__vig" aria-hidden="true"></div>
+						<p class="dungeon__xp" aria-hidden="true">✦ 0</p>
+						<p class="dungeon__hint" aria-hidden="true"><span>CLICK</span><span>↑↓ WALK</span><span>⇧ DASH</span></p>
 					</div>
-				</header>
-	
-				<main id="index" role="main" class="inner cover">
-					<h1 class="cover-heading">Martin Sosa</h1>
-					<p id="sub-title" class="lead">Full Stack Developer</p>
-					<p class="lead">
-						<a id="index-button" class="btn btn-dark btn-lg btn-primary-outline">View Projects</a>
+					<p class="char-sheet__since">EST. 2014</p>
+				</div>
+
+				<div class="char-sheet__info">
+					<p class="char-sheet__eyebrow">▸ A FULL-STACK SOFTWARE ENGINEER APPEARS</p>
+					<h1 id="hero-name" class="char-sheet__name">Martin Sosa</h1>
+					<p class="char-sheet__class">Full-Stack Software Engineer</p>
+					<ul class="char-sheet__tags" aria-label="Character details">
+						<li class="tag tag--gold">Focus: AI Integration</li>
+						<li class="tag">📍 New York, NY</li>
+						<li class="tag">6+ yrs · Fortune 500 → Independent</li>
+					</ul>
+
+					<p class="char-sheet__bio">
+						Full-stack engineer shipping production web and mobile in React&nbsp;19 / TypeScript
+						and Node.js / PostgreSQL — with LLM APIs (Claude, Gemini) behind real guardrails and
+						self-hosted model infrastructure. Six-plus years deep in AI-driven document processing at a
+						Fortune&nbsp;500 insurer before going independent.
 					</p>
-				</main>
-				
 
-				<main id="projects" class="hidden">
-					<p id="sub-title"><a class="btn" data-toggle="modal" href="#martinModal">Projects</a>|</p>
-					<p class="lead">
-						<a id="project-button" class="btn btn-dark btn-lg btn-primary-outline">Contact Me</a>
-					</p>
-
-				</main>
-
-				<main id="contact" class="hidden">
-					<p id="sub-title"> Email: <a href="mailto: mr.martinsosa@gmail.com"> mr.martinsosa@gmail.com</a></p>
-					<p id="sub-title"> Github: <a href="https://www.github.com/mr-martinsosa">mr-martinsosa</a></p>
-					<p id="sub-title"> Linkedin: <a href="https://www.linkedin.com/in/mr-martinsosa">mr-martinsosa</a></p>
-					<p id="sub-title"> About.me: <a href="https://about.me/martin.sosa">martin.sosa</a></p>
-					
-					<p class="lead">
-							<a id="contact-button" class="btn btn-dark btn-lg btn-primary-outline">Home</a>
-						</p>
-				</main>
-				
-				<div class="modal" id="martinModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLongTitle" aria-hidden="true">
-					<div class="modal-header">
-							<h4 class="modal-title text-uppercase text-center">portfolio</h4>
-					 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-				      <span aria-hidden="true">&times;</span>
-				     </button>
-				  </div>
-				<div class="modal-body">
-				  <div class="container-fluid">
-						<div class="row">
-							<div class="card" style="width: 23rem;">
-							<a href="https://github.com/mr-martinsosa/poke-tumblr"><img class="card-img-top" src="https://camo.githubusercontent.com/e950e3540453865f1b8158d27c30d535a43b1829/68747470733a2f2f692e696d6775722e636f6d2f624274456551372e706e67" alt="Card image cap"></a>
+					<div class="vitals" aria-hidden="true">
+						<div class="vital">
+							<span class="vital__label">HP</span>
+							<span class="vital__bar"><i class="vital__fill vital__fill--hp" style="--v:100%"></i></span>
 						</div>
-						<div class="card" style="width: 23rem;">
-						<a href="https://github.com/mr-martinsosa/confetti-betty"><iframe width="630" height="394" src="https://www.useloom.com/embed/28d0af1efe6c42028ac2c5bb37e30f03" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen  class="card-img-top" alt="Card image cap"></iframe></a>
+						<div class="vital">
+							<span class="vital__label">MP</span>
+							<span class="vital__bar"><i class="vital__fill vital__fill--mp" style="--v:92%"></i></span>
 						</div>
 					</div>
 
-				<footer class="mastfoot mt-auto">
-					<audio id="music" controls autoplay loop>
-						<source src="audio/music.mp3" type="audio/mpeg"/>
-					</audio>
-				</footer>
+					<div class="hero__cta">
+						<a class="btn btn--primary" href="#quests">⚔ Enter the Dungeon</a>
+						<a class="btn" href="#contact">✉ Make Contact</a>
+					</div>
+				</div>
 			</div>
 
-		<!-- Bootstrap JS -->
-		<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
-		<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
-		<script src="index.js"></script>
-	</body>
+			<a class="scroll-hint" href="#skills" aria-label="Scroll to skills">
+				<span aria-hidden="true">▼ DESCEND ▼</span>
+			</a>
+		</section>
 
+		<!-- ===== SKILLS / STATS + LOADOUT ===== -->
+		<section id="skills" class="zone" aria-labelledby="skills-title">
+			<header class="zone__head">
+				<h2 id="skills-title" class="zone__title"><svg class="sprite sprite--title" aria-hidden="true"><use href="#spr-potion"/></svg> Stats &amp; Loadout</h2>
+				<p class="zone__sub">Self-rated proficiency. Hover a bar for the gist.</p>
+			</header>
+
+			<div class="grid grid--2">
+				<!-- Headline stat bars -->
+				<div class="panel stats">
+					<h3 class="panel__title">Core Stats</h3>
+					<ul class="statlist">
+						<li class="stat" title="End-to-end product engineering, frontend through database.">
+							<span class="stat__name">Full-Stack</span>
+							<span class="stat__track"><i class="stat__fill" style="--lvl:92%"></i></span>
+							<span class="stat__num">92</span>
+						</li>
+						<li class="stat" title="LLM API integration with auth, rate-limiting and prompt-injection guardrails.">
+							<span class="stat__name">AI Integration</span>
+							<span class="stat__track"><i class="stat__fill stat__fill--mana" style="--lvl:85%"></i></span>
+							<span class="stat__num">85</span>
+						</li>
+						<li class="stat" title="React 19, React Native, TypeScript, responsive UI.">
+							<span class="stat__name">Frontend</span>
+							<span class="stat__track"><i class="stat__fill" style="--lvl:88%"></i></span>
+							<span class="stat__num">88</span>
+						</li>
+						<li class="stat" title="Node/Express, PostgreSQL, Firebase, REST API design.">
+							<span class="stat__name">Backend / DB</span>
+							<span class="stat__track"><i class="stat__fill" style="--lvl:84%"></i></span>
+							<span class="stat__num">84</span>
+						</li>
+						<li class="stat" title="GitHub Actions CI/CD, Docker, self-hosted GPU infra, Tailscale.">
+							<span class="stat__name">DevOps / Infra</span>
+							<span class="stat__track"><i class="stat__fill" style="--lvl:78%"></i></span>
+							<span class="stat__num">78</span>
+						</li>
+					</ul>
+				</div>
+
+				<!-- Loadout / skill chips -->
+				<div class="panel loadout">
+					<h3 class="panel__title">Loadout</h3>
+					<div class="loadout__group">
+						<h4 class="loadout__cat">Languages</h4>
+						<ul class="chips">
+							<li class="chip chip--key">TypeScript</li>
+							<li class="chip chip--key">JavaScript (ES6+)</li>
+							<li class="chip chip--key">Python</li>
+							<li class="chip">SQL / PostgreSQL</li>
+							<li class="chip">PHP</li>
+						</ul>
+					</div>
+					<div class="loadout__group">
+						<h4 class="loadout__cat">Frontend &amp; Mobile</h4>
+						<ul class="chips">
+							<li class="chip chip--key">React 19</li>
+							<li class="chip chip--key">React Native (Expo)</li>
+							<li class="chip">Tailwind CSS</li>
+							<li class="chip">Vite</li>
+						</ul>
+					</div>
+					<div class="loadout__group">
+						<h4 class="loadout__cat">Backend &amp; Data</h4>
+						<ul class="chips">
+							<li class="chip chip--key">Node.js (Express 5)</li>
+							<li class="chip">PostgreSQL</li>
+							<li class="chip">Firebase</li>
+						</ul>
+					</div>
+					<div class="loadout__group">
+						<h4 class="loadout__cat">AI / LLM</h4>
+						<ul class="chips">
+							<li class="chip chip--key">Claude &amp; Gemini APIs</li>
+							<li class="chip">LLM guardrails</li>
+							<li class="chip">Self-hosted (Ollama)</li>
+							<li class="chip">MCP</li>
+						</ul>
+					</div>
+					<div class="loadout__group">
+						<h4 class="loadout__cat">DevOps &amp; Security</h4>
+						<ul class="chips">
+							<li class="chip">GitHub Actions</li>
+							<li class="chip">Docker</li>
+							<li class="chip">NVIDIA CUDA</li>
+							<li class="chip">Tailscale</li>
+							<li class="chip">JWT / bcrypt</li>
+							<li class="chip">Vercel</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ===== QUEST LOG / PROJECTS ===== -->
+		<section id="quests" class="zone" aria-labelledby="quests-title">
+			<header class="zone__head">
+				<h2 id="quests-title" class="zone__title"><svg class="sprite sprite--title" aria-hidden="true"><use href="#spr-sword"/></svg> Quest Log</h2>
+				<p class="zone__sub">The active campaign. Headline work lives in private repos — happy to walk through the code.</p>
+			</header>
+
+			<ul class="quests">
+				<!-- KODA -->
+				<li class="quest quest--legendary">
+					<div class="quest__head">
+						<span class="quest__rarity">★ Legendary</span>
+						<span class="badge badge--private"><svg class="sprite sprite--badge" aria-hidden="true"><use href="#spr-lock"/></svg> Private repo</span>
+					</div>
+					<h3 class="quest__title">KODA — Scholastic Esports LMS</h3>
+					<p class="quest__meta">Full-Stack Engineer · Jan 2026 – Present</p>
+					<p class="quest__desc">
+						A React&nbsp;19 / TypeScript learning-management platform for K–12 scholastic esports on a
+						Firebase backend, designed for an addressable market of 700+ Title&nbsp;I schools in NYC.
+						Shipped <strong>KODA&nbsp;Coach</strong> — an in-app AI assistant on the Gemini API via a Firebase
+						callable function, with auth gating, rate limiting, prompt-injection input sanitization, and
+						per-user context injection. Real-time bracket engine (single/double elimination + round-robin)
+						and role-based access control, built to FERPA/COPPA standards.
+					</p>
+					<ul class="quest__loot">
+						<li class="chip chip--xp">110+ PRs merged</li>
+						<li class="chip chip--xp">Zero-downtime previews</li>
+						<li class="chip chip--xp">FERPA / COPPA</li>
+					</ul>
+					<ul class="quest__tags">
+						<li class="chip">React 19</li><li class="chip">TypeScript</li><li class="chip">Firebase</li><li class="chip">Gemini API</li><li class="chip">GitHub Actions</li>
+					</ul>
+				</li>
+
+				<!-- Ledes -->
+				<li class="quest quest--epic">
+					<div class="quest__head">
+						<span class="quest__rarity">◆ Epic</span>
+						<span class="badge badge--private"><svg class="sprite sprite--badge" aria-hidden="true"><use href="#spr-lock"/></svg> Private repo</span>
+					</div>
+					<h3 class="quest__title">Ledes — Category-Selective Microblogging</h3>
+					<p class="quest__meta">Full-Stack Mobile Engineer · Sep 2025 – Present</p>
+					<p class="quest__desc">
+						A social mobile app with a novel “lede” model — followers subscribe to specific content buckets
+						(e.g. Tech vs. Sports) per creator. React Native (Expo) + TypeScript front end on a
+						Node.js / Express&nbsp;5 + PostgreSQL backend: an 18-endpoint REST API, JWT auth with silent token
+						refresh, gesture-driven UI (Reanimated), optimistic updates, and full-text search.
+					</p>
+					<ul class="quest__loot">
+						<li class="chip chip--xp">18-endpoint API</li>
+						<li class="chip chip--xp">Silent token refresh</li>
+						<li class="chip chip--xp">Optimistic UI</li>
+					</ul>
+					<ul class="quest__tags">
+						<li class="chip">React Native</li><li class="chip">TypeScript</li><li class="chip">Node / Express</li><li class="chip">PostgreSQL</li>
+					</ul>
+				</li>
+
+				<!-- Hermes -->
+				<li class="quest quest--rare">
+					<div class="quest__head">
+						<span class="quest__rarity">❖ Rare</span>
+						<span class="badge badge--private"><svg class="sprite sprite--badge" aria-hidden="true"><use href="#spr-lock"/></svg> Private repo</span>
+					</div>
+					<h3 class="quest__title">Hermes — Self-Hosted LLM Stack</h3>
+					<p class="quest__meta">Deployment &amp; Ops · 2026</p>
+					<p class="quest__desc">
+						Deployed &amp; operate a self-hosted Qwen3-8B (64k context) via Ollama alongside a Dockerized
+						ComfyUI/SDXL image service with NVIDIA CUDA GPU passthrough on a remote box. Shared-VRAM
+						management (model eviction before image generation), idempotent phased deploys
+						(preflight → build → smoke → integrate) with automatic rollback, and zero-port-forward remote
+						access over a Tailscale (WireGuard) mesh — wired into a Discord <code>/imagine</code> command.
+					</p>
+					<ul class="quest__loot">
+						<li class="chip chip--xp">Shared-GPU VRAM ops</li>
+						<li class="chip chip--xp">Phased deploys + rollback</li>
+						<li class="chip chip--xp">WireGuard mesh</li>
+					</ul>
+					<ul class="quest__tags">
+						<li class="chip">Ollama</li><li class="chip">Docker</li><li class="chip">NVIDIA CUDA</li><li class="chip">Tailscale</li>
+					</ul>
+				</li>
+			</ul>
+
+			<!-- Side quests / archives -->
+			<header class="zone__head zone__head--mini">
+				<h3 class="zone__title zone__title--mini"><svg class="sprite sprite--title" aria-hidden="true"><use href="#spr-chest"/></svg> Side Quests &amp; The Archives</h3>
+				<p class="zone__sub">Earlier open-source adventures — fully explorable.</p>
+			</header>
+			<ul class="sidequests">
+				<li class="sidequest">
+					<a href="https://github.com/mr-martinsosa/warbase" target="_blank" rel="noopener">
+						<h4 class="sidequest__name">warbase</h4>
+						<span class="sidequest__desc">Map-based conquest game on the Foursquare API — claim and hold real-world locations.</span>
+						<span class="sidequest__tag chip">Ruby</span>
+					</a>
+				</li>
+				<li class="sidequest">
+					<a href="https://github.com/mr-martinsosa/exp-atk" target="_blank" rel="noopener">
+						<h4 class="sidequest__name">exp-atk</h4>
+						<span class="sidequest__desc">Full-stack forum platform built by a team of four.</span>
+						<span class="sidequest__tag chip">Ruby</span>
+					</a>
+				</li>
+				<li class="sidequest">
+					<a href="https://github.com/mr-martinsosa/personal-pokedex" target="_blank" rel="noopener">
+						<h4 class="sidequest__name">personal-pokedex</h4>
+						<span class="sidequest__desc">Pokédex powered by the PokéAPI with AJAX &amp; JSON.</span>
+						<span class="sidequest__tag chip">JavaScript</span>
+					</a>
+				</li>
+				<li class="sidequest">
+					<a href="https://github.com/mr-martinsosa/ROScripts" target="_blank" rel="noopener">
+						<h4 class="sidequest__name">ROScripts</h4>
+						<span class="sidequest__desc">Scripts for Ragnarok Online private servers — where the adventure started.</span>
+						<span class="sidequest__tag chip">Game dev</span>
+					</a>
+				</li>
+			</ul>
+			<p class="archives-link">
+				<a class="btn btn--ghost" href="https://github.com/mr-martinsosa?tab=repositories" target="_blank" rel="noopener">⛁ Browse all 32 repositories in the archives →</a>
+			</p>
+		</section>
+
+		<!-- ===== CHRONICLE / EXPERIENCE + EDUCATION ===== -->
+		<section id="chronicle" class="zone" aria-labelledby="chronicle-title">
+			<header class="zone__head">
+				<h2 id="chronicle-title" class="zone__title"><svg class="sprite sprite--title" aria-hidden="true"><use href="#spr-scroll"/></svg> Chronicle</h2>
+				<p class="zone__sub">The campaign history.</p>
+			</header>
+
+			<ol class="timeline">
+				<li class="tl">
+					<div class="tl__when">Jan 2025 – Present</div>
+					<div class="panel tl__body">
+						<h3 class="tl__role">Independent Software Engineer</h3>
+						<p class="tl__org">Remote</p>
+						<p class="tl__desc">Full-stack product engineering and AI infrastructure — KODA, Ledes, and the Hermes self-hosted LLM stack (see the Quest Log above).</p>
+					</div>
+				</li>
+				<li class="tl">
+					<div class="tl__when">Oct 2018 – Jan 2025</div>
+					<div class="panel tl__body">
+						<h3 class="tl__role">Software Engineer</h3>
+						<p class="tl__org">Equitable — Secaucus, NJ (Remote/Hybrid) · <span class="tl__note">promoted from Workflow Analyst</span></p>
+						<p class="tl__desc">
+							Optimized the Python services powering <strong>Hyperscience</strong>, an AI-driven OCR platform parsing
+							high-variance, semi-structured insurance documents — including incomplete and corrupted inputs.
+							Refined the SmartFix classification algorithm and automated email-to-database and batch workflows
+							with Python + SQL feeding Tableau dashboards.
+						</p>
+						<ul class="quest__loot">
+							<li class="chip chip--xp">+60% classification accuracy</li>
+							<li class="chip chip--xp">−90% manual effort</li>
+							<li class="chip chip--xp">−75% manual data entry</li>
+							<li class="chip chip--xp">+60% uptime (&lt;1% downtime)</li>
+							<li class="chip chip--xp">−40% turnaround</li>
+						</ul>
+					</div>
+				</li>
+				<li class="tl">
+					<div class="tl__when">Origin</div>
+					<div class="panel tl__body">
+						<h3 class="tl__role">Training</h3>
+						<p class="tl__desc">
+							<strong>B.S. Computer Science</strong> — Polytechnic Institute of NYU, 2014.<br>
+							<strong>Software Engineering Intensive Certificate</strong> — NY Code + Design Academy, 2018.
+						</p>
+					</div>
+				</li>
+			</ol>
+		</section>
+
+		<!-- ===== CONTACT ===== -->
+		<section id="contact" class="zone" aria-labelledby="contact-title">
+			<div class="panel contact">
+				<svg class="sprite sprite--contact" aria-hidden="true"><use href="#spr-scroll"/></svg>
+				<h2 id="contact-title" class="zone__title zone__title--center">Make Contact</h2>
+				<p class="contact__lead">Recruiting, building, or just want to talk shop? Send word.</p>
+				<ul class="contact__links">
+					<li><a class="btn btn--primary" href="mailto:mr.martinsosa@gmail.com">✉ mr.martinsosa@gmail.com</a></li>
+					<li><a class="btn" href="https://github.com/mr-martinsosa" target="_blank" rel="noopener">⌥ GitHub — mr-martinsosa</a></li>
+					<li><a class="btn" href="https://www.linkedin.com/in/mr-martinsosa" target="_blank" rel="noopener">in LinkedIn — mr-martinsosa</a></li>
+					<li><a class="btn" href="https://about.me/martin.sosa" target="_blank" rel="noopener">✦ about.me — martin.sosa</a></li>
+				</ul>
+			</div>
+		</section>
+	</main>
+
+	<footer class="foot">
+		<p class="foot__line">
+			<span class="foot__glyph" aria-hidden="true">@</span>
+			Hand-built from scratch, no frameworks.
+		</p>
+		<p class="foot__line foot__line--dim">© <span id="year">2026</span> Martin Sosa · New York, NY · <span class="foot__hint">try the ↑↑↓↓←→←→BA</span></p>
+	</footer>
+
+	<!-- (slimes now live inside the mini-dungeon) -->
+
+	<!-- optional dungeon ambience: reuses the track from the original site, off by default -->
+	<audio id="ambience" loop preload="none" src="legacy/audio/music.mp3"></audio>
+
+	<script src="index.js"></script>
+</body>
 </html>
