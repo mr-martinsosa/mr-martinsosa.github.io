@@ -10,6 +10,11 @@
    come in the full-world build phase.
    ===================================================================== */
 import * as THREE from "./vendor/three.module.min.js";
+import { EffectComposer } from "./vendor/EffectComposer.js";
+import { RenderPass } from "./vendor/RenderPass.js";
+import { UnrealBloomPass } from "./vendor/UnrealBloomPass.js";
+import { ShaderPass } from "./vendor/ShaderPass.js";
+import { OutputPass } from "./vendor/OutputPass.js";
 
 export function initDungeon3D(opts) {
 	var dungeon = opts.dungeon;
@@ -35,6 +40,10 @@ export function initDungeon3D(opts) {
 	var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "low-power" });
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
+	/* filmic tone mapping (applied by OutputPass at the end of the composer) lifts the torch-lit scene
+	   out of "flat WebGL" into a graded look; exposure tuned against the dimmer dungeon palette */
+	renderer.toneMapping = THREE.ACESFilmicToneMapping;
+	renderer.toneMappingExposure = 1.18;
 
 	var scene = new THREE.Scene();
 	/* a richer, slightly-lit purple haze instead of near-black — the far hall glows rather than
@@ -56,6 +65,38 @@ export function initDungeon3D(opts) {
 	var homePos = new THREE.Vector3(), lookAt = new THREE.Vector3();
 	var fromPos = new THREE.Vector3(), toPos = new THREE.Vector3();
 	var fromLook = new THREE.Vector3(), toLook = new THREE.Vector3();
+
+	/* ---- post-processing: bloom on the torches/portal + a warm grade & vignette ----
+	   Bloom stays ON during the idle "home" view on purpose: that view isn't static — the floating camera
+	   drifts and the torches flicker continuously, so the glow is the showcase, not wasted work. Cost is
+	   bounded: the loop only runs while the hero is on-screen (IntersectionObserver) and the tab is visible,
+	   and the bloom is computed at CSS resolution (see resize) so it's cheap even on hi-dpi. */
+	var composer = new EffectComposer(renderer);
+	composer.addPass(new RenderPass(scene, camera));
+	/* (resolution, strength, radius, threshold) — threshold high so only the bright fire/portal/dust bloom */
+	var bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.72, 0.5, 0.65);
+	composer.addPass(bloomPass);
+	/* a tiny full-screen grade: gentle saturation + warm push + edge vignette (the canvas-only vignette
+	   reinforces the page's CSS one over the hero) */
+	var gradePass = new ShaderPass({
+		uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.34 }, uWarm: { value: 0.016 }, uSat: { value: 1.14 } },
+		vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+		fragmentShader: [
+			"uniform sampler2D tDiffuse; uniform float uVignette; uniform float uWarm; uniform float uSat; varying vec2 vUv;",
+			"void main(){",
+			"  vec3 c = texture2D(tDiffuse, vUv).rgb;",
+			"  float l = dot(c, vec3(0.299, 0.587, 0.114));",
+			"  c = mix(vec3(l), c, uSat);",                                /* saturation */
+			"  c += vec3(uWarm, uWarm * 0.35, -uWarm * 0.55);",            /* warm torchlight grade */
+			"  vec2 d = vUv - 0.5;",
+			"  float vig = smoothstep(0.9, 0.32, length(d));",             /* 1 centre → 0 corners */
+			"  c *= mix(1.0 - uVignette, 1.0, vig);",
+			"  gl_FragColor = vec4(c, 1.0);",
+			"}"
+		].join("\n")
+	});
+	composer.addPass(gradePass);
+	composer.addPass(new OutputPass());   /* tone-map (renderer.toneMapping) + sRGB encode, at the very end */
 
 	/* ---- lighting: readable warm base + flickering torch pools ----
 	   (light COLORS must be reasonably bright — a dark ambient color emits almost nothing) */
@@ -636,7 +677,7 @@ export function initDungeon3D(opts) {
 				if (pin) pin.material.opacity = 0.42 + (reduceMotion ? 0 : Math.sin(time * 2) * 0.12);
 			}
 
-			renderer.render(scene, camera);
+			composer.render();
 			dirty = false;
 		}
 
@@ -655,6 +696,10 @@ export function initDungeon3D(opts) {
 	function resize() {
 		var w = dungeon.clientWidth || 300, h = dungeon.clientHeight || 380;
 		renderer.setSize(w, h, false);
+		composer.setSize(w, h);          /* scene + grade + output at the device pixel ratio (stays crisp) */
+		bloomPass.setSize(w, h);         /* but compute the soft bloom at CSS px — ~1x on hi-dpi: far cheaper
+		                                    fill + VRAM, and visually indistinguishable for a blurred glow.
+		                                    (must follow composer.setSize, which would otherwise size it at full pr) */
 		camera.aspect = w / h; camera.updateProjectionMatrix();
 		markDirty();
 	}
@@ -693,6 +738,7 @@ export function initDungeon3D(opts) {
 			window.removeEventListener("keyup", onKeyUp);
 			window.removeEventListener("pointerup", onPointerUp);
 			if (hsLayer && hsLayer.parentNode) hsLayer.parentNode.removeChild(hsLayer);
+			composer.dispose();
 			renderer.dispose();
 		}
 	};
