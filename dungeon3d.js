@@ -54,7 +54,7 @@ export function initDungeon3D(opts) {
 	/* a richer, slightly-lit purple haze instead of near-black — the far hall glows rather than
 	   crushing to black, which reads as more vivid + sells depth (2a polish) */
 	scene.background = new THREE.Color(0x171026);
-	scene.fog = new THREE.FogExp2(0x1b1330, 0.034);   /* hides the far recycle seam + sells depth */
+	scene.fog = new THREE.FogExp2(0x1b1330, 0.026);   /* gentle depth haze — light enough that the back wall + portal read */
 
 	var camera = new THREE.PerspectiveCamera(64, 1, 0.1, 200);
 	camera.position.set(CAM.x, CAM.y, CAM.z);
@@ -477,10 +477,17 @@ export function initDungeon3D(opts) {
 		scroll.rotation.z = Math.PI / 2; scroll.position.set(0, 1.03, 0.05); g.add(scroll);
 	}
 	function buildPortal(g) {
-		var ring = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.12, 8, 7), flat(0x4a4163, { emissive: 0x2a1f44 }));
-		ring.position.y = 1.15; g.add(ring);
-		var inner = new THREE.Mesh(new THREE.CircleGeometry(0.7, 7), new THREE.MeshBasicMaterial({ color: 0x7a4fd0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-		inner.position.set(0, 1.15, 0.02); g.add(inner);
+		/* the grand centerpiece on the back wall — the payoff at the end of the runner */
+		var Y = 2.0;
+		var ring = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.17, 10, 9), flat(0x4a4163, { emissive: 0x33255c }));
+		ring.position.y = Y; g.add(ring);
+		var inner = new THREE.Mesh(new THREE.CircleGeometry(1.24, 9), new THREE.MeshBasicMaterial({ color: 0x8a5fe0, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+		inner.position.set(0, Y, 0.04); g.add(inner);
+		/* a soft halo + a cool point light so it glows through the fog and lights the back of the room
+		   (warm torches up front vs cool portal at the back = cinematic depth) */
+		var halo = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ map: radialTex("rgba(150,100,232,0.7)", "rgba(150,100,232,0)"), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+		halo.position.set(0, Y, 0.05); g.add(halo);
+		var plight = new THREE.PointLight(0x8a5fe0, 16, 13, 2); plight.position.set(0, Y, 1.2); g.add(plight);
 		g.userData.portalInner = inner;
 	}
 
@@ -500,7 +507,7 @@ export function initDungeon3D(opts) {
 		if (h.kind === "chest") buildChest(g);
 		else if (h.kind === "altar") buildAltar(g);
 		else if (h.kind === "lectern") buildLectern(g);
-		else if (h.kind === "portal") { buildPortal(g); labelY = 2.55; }
+		else if (h.kind === "portal") { buildPortal(g); labelY = 3.7; }
 		var glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: landmarkGlowTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
 		glow.position.set(0, 0.75, 0.06); g.add(glow);
 		scene.add(g);
