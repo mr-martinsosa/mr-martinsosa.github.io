@@ -1,0 +1,7 @@
+# local visual-test screenshots (not part of the site)
+screenshots-test/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

@@ -35,16 +35,20 @@ export function initDungeon3D(opts) {
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 	var scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x07060c);
-	scene.fog = new THREE.FogExp2(0x07060c, 0.055);   /* hides the far recycle seam + sells depth */
+	scene.background = new THREE.Color(0x0c0a14);
+	scene.fog = new THREE.FogExp2(0x0c0a14, 0.04);   /* hides the far recycle seam + sells depth */
 
 	var camera = new THREE.PerspectiveCamera(64, 1, 0.1, 200);
 	camera.position.set(CAM.x, CAM.y, CAM.z);
 	camera.lookAt(0, 1.15, -12);
 
-	/* ---- lighting: dim warm base + flickering torch pools ---- */
-	scene.add(new THREE.AmbientLight(0x3a2a30, 1.6));
-	scene.add(new THREE.HemisphereLight(0x2a2230, 0x05040a, 0.5));
+	/* ---- lighting: readable warm base + flickering torch pools ----
+	   (light COLORS must be reasonably bright — a dark ambient color emits almost nothing) */
+	scene.add(new THREE.AmbientLight(0x6b6276, 2.6));
+	scene.add(new THREE.HemisphereLight(0x8a7d9c, 0x241c2c, 1.5));
+	/* a warm "hero" light that follows the rogue so the character always reads, wherever the torches are */
+	var heroLight = new THREE.PointLight(0xffd9a8, 20, 10, 2);
+	heroLight.position.set(0, 2.1, ROGUE_Z + 2.0); scene.add(heroLight);
 
 	/* ======================= procedural textures ======================= */
 	function px2(draw) {
@@ -144,7 +148,7 @@ export function initDungeon3D(opts) {
 		bracket.position.set(side * (HALF_W - 0.12), 2.0, 0); t.add(bracket);
 		var flame = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
 		flame.position.set(side * (HALF_W - 0.12), 2.5, 0.02); t.add(flame);
-		var light = new THREE.PointLight(0xff8a3d, 14, 16, 2);
+		var light = new THREE.PointLight(0xff8a3d, 38, 20, 2);
 		light.position.set(side * (HALF_W - 0.3), 2.45, 0); t.add(light);
 		t.position.z = NEAR - (ti + 1) * TORCH_GAP;
 		t.userData = { flame: flame, light: light, seed: rnd() * 6.28 };
@@ -158,7 +162,7 @@ export function initDungeon3D(opts) {
 		o = o || {};
 		return new THREE.MeshPhongMaterial({ color: color, flatShading: true, shininess: o.shininess || 6, specular: o.specular || 0x14121a, emissive: o.emissive || 0x000000 });
 	}
-	var C_CLOAK = 0x241f33, C_HOOD = 0x15131d, C_TRIM = 0xe8c170, C_SKIN = 0x2a2330, C_STEEL = 0xcfd6e6;
+	var C_CLOAK = 0x352d4a, C_HOOD = 0x1a1626, C_TRIM = 0xe8c170, C_SKIN = 0x3a3048, C_STEEL = 0xcfd6e6;
 	/* a pivoting limb: a Group at the joint, with the limb hanging below the origin so it swings from the top */
 	function limb(len, w, color, jx, jy) {
 		var g = new THREE.Group(); g.position.set(jx, jy, 0);
@@ -171,17 +175,22 @@ export function initDungeon3D(opts) {
 	var belt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 6), flat(C_TRIM, { shininess: 30 }));
 	belt.position.y = 0.74; rogue.add(belt);
 	/* head + pointed hood, with two faint gold eyes peering out */
-	var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15, 0), flat(C_SKIN));
+	var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), flat(C_SKIN));
 	head.position.y = 1.4; rogue.add(head);
-	var hood = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.42, 6), flat(C_HOOD));
-	hood.position.set(0, 1.46, -0.02); rogue.add(hood);
-	var gaze = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: C_TRIM }));
-	gaze.position.set(0, 1.4, 0.135); rogue.add(gaze);
+	/* a low, wide cowl that wraps the head — not a witch hat */
+	var hood = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.28, 7), flat(C_HOOD));
+	hood.position.set(0, 1.47, -0.03); rogue.add(hood);
+	/* two glowing eyes with a gap (so it doesn't read as a single-eyed cyclops) */
+	function eye(x) {
+		var e = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.02), new THREE.MeshBasicMaterial({ color: C_TRIM }));
+		e.position.set(x, 1.38, 0.14); rogue.add(e); return e;
+	}
+	eye(-0.07); eye(0.07);
 	/* arms (pivot at shoulders) + legs (pivot at hips) */
 	var armL = limb(0.42, 0.09, C_CLOAK, -0.22, 1.18);
 	var armR = limb(0.42, 0.09, C_CLOAK, 0.22, 1.18);
-	var legL = limb(0.5, 0.11, C_HOOD, -0.1, 0.56);
-	var legR = limb(0.5, 0.11, C_HOOD, 0.1, 0.56);
+	var legL = limb(0.5, 0.11, C_CLOAK, -0.1, 0.56);
+	var legR = limb(0.5, 0.11, C_CLOAK, 0.1, 0.56);
 	/* a little gold dagger in the right hand (on-brand with the sword motif) */
 	var dagger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05), flat(C_STEEL, { shininess: 60, specular: 0x9aa2b8 }));
 	dagger.position.y = -0.42; dagger.rotation.x = -0.35; armR.add(dagger);
@@ -331,6 +340,7 @@ export function initDungeon3D(opts) {
 		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
 		camera.position.x += (heroX * 0.22 - camera.position.x) * Math.min(1, dt * 6);
 		aura.position.x = rogue.position.x;
+		heroLight.position.x = rogue.position.x;   /* keep the hero light over the rogue as it strafes */
 		aura.material.opacity += ((dashing ? 0.85 : 0) - aura.material.opacity) * Math.min(1, dt * 12);
 
 		/* scroll the shell textures so the stone surfaces move with you */
@@ -356,7 +366,7 @@ export function initDungeon3D(opts) {
 			for (i = 0; i < torches.length; i++) {
 				var T = torches[i]; wrap(T, dz);
 				var fl = reduceMotion ? 0.85 : 0.72 + Math.sin(time * 11 + T.userData.seed) * 0.12 + Math.sin(time * 23 + T.userData.seed) * 0.08;
-				T.userData.light.intensity = 14 * fl;
+				T.userData.light.intensity = 38 * fl;
 				T.userData.flame.scale.set(0.85 + fl * 0.3, 0.8 + fl * 0.4, 1);
 				T.userData.flame.material.opacity = 0.7 + fl * 0.3;
 			}
