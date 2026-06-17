@@ -54,7 +54,7 @@
 		sections.forEach(function (s) { spy.observe(s); });
 	}
 
-	/* ---- RPG pause menu: the accessible, no-game-required way into everything ---- */
+	/* ---- RPG pause menu: the accessible way into everything ---- */
 	var menuBtn = document.getElementById("menu-btn");
 	var menu = document.getElementById("rpg-menu");
 	if (menuBtn && menu) {
