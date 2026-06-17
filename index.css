@@ -443,6 +443,26 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 @keyframes xp-float { 0% { opacity: 0; transform: translate(-50%, -40%) scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -160%) scale(1); } }
 @keyframes hint-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
+/* =================== full-viewport immersive hero (2a) =================== */
+/* only active once the real-3D dungeon boots (desktop + WebGL); fallback/mobile keep the boxed char-sheet.
+   #dungeon sits at z-index:-1 so it backdrops the hero while the (static) char-sheet content paints over it. */
+.world-on .char-sheet__portrait { position: static; min-height: 0; padding: 0; border: none; background: none; box-shadow: none; }
+.world-on #dungeon {
+	position: absolute; inset: 0; width: auto; height: auto; max-width: none;
+	aspect-ratio: auto; border: none; border-radius: 0; box-shadow: none; z-index: -1; cursor: default;
+}
+.world-on .char-sheet__since { display: none; }
+.world-on .hero { justify-content: flex-end; padding-bottom: clamp(2rem, 6vh, 4rem); }
+/* drop the char-sheet's own panel chrome + positioning so #dungeon's offset parent becomes .hero (full viewport) */
+.world-on .char-sheet { position: static; background: none; border: none; box-shadow: none; padding: 0; grid-template-columns: 1fr; max-width: 540px; }
+.world-on .char-sheet__info {
+	background: rgba(11, 10, 16, .62); border: 2px solid var(--stone-edge); border-radius: var(--radius);
+	padding: clamp(1.2rem, 3vw, 1.8rem); backdrop-filter: blur(3px);
+	box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+}
+/* the full-screen hint rail is noise over a full hero — the MENU button carries the wayfinding now */
+.world-on .dungeon__hint { display: none; }
+
 /* ============================ responsive ========================== */
 @media (max-width: 760px) {
 	html { scroll-padding-top: 76px; }

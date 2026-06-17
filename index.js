@@ -125,6 +125,7 @@
 		if (prefer3D && glCanvas) {
 			import("./dungeon3d.js")
 				.then(function (m) { return m.initDungeon3D({ dungeon: dungeon, canvas: glCanvas, xpEl: xpEl, reduceMotion: reduceMotion }); })
+				.then(function () { document.body.classList.add("world-on"); })   /* promote the hero to a full-viewport world */
 				.catch(function (err) { if (window.console && console.warn) { console.warn("3D dungeon unavailable — using 2.5D fallback.", err); } start2DDungeon(); });
 		} else {
 			start2DDungeon();
