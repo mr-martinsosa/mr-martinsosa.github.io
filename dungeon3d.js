@@ -288,11 +288,14 @@ export function initDungeon3D(opts) {
 	   scale + ground offset fits them all. The rig's root sits at the feet, centred in x/z. */
 	var MODEL_YAW = 0;     /* Quaternius rig faces +Z; the rogue group's PI yaw already turns it down the hall (away from camera), matching the procedural rogue */
 	var character = null, mixer = null, actIdle = null, actWalk = null, actRun = null, curAct = null;
+	/* fire opts.onReady() exactly once — the host dismisses the loading screen on it */
+	function fireReady() { if (opts.onReady) { var f = opts.onReady; opts.onReady = null; f(); } }
 	if (opts.characterUrl) {
 		/* hide the procedural stand-in up front so it never flashes before the .glb arrives; it's
 		   restored only if the model (or GLTFLoader) actually fails to load */
 		proc.visible = false;
-		var charFailed = function (err) { proc.visible = true; markDirty(); if (window.console && console.warn) console.warn("character model failed to load — using the procedural rogue.", err); };
+		var charFailed = function (err) { proc.visible = true; markDirty(); if (window.console && console.warn) console.warn("character model failed to load — using the procedural rogue.", err); fireReady(); };
+		setTimeout(fireReady, 9000);   /* safety: reveal the room even if the character download stalls */
 		import("./vendor/GLTFLoader.js").then(function (mod) {
 			new mod.GLTFLoader().load(opts.characterUrl, function (gltf) {
 				var model = gltf.scene;
@@ -324,9 +327,11 @@ export function initDungeon3D(opts) {
 				if (ci) { actIdle = mixer.clipAction(ci); actIdle.play(); curAct = actIdle; }
 				if (cw) actWalk = mixer.clipAction(cw);
 				if (cr) actRun = mixer.clipAction(cr);
-				markDirty();
+				markDirty(); fireReady();   /* character in → host can reveal the scene */
 			}, undefined, charFailed);
 		}).catch(charFailed);
+	} else {
+		setTimeout(fireReady, 0);   /* no character — ready once init + world-on settle */
 	}
 
 	/* ======================= set dressing: pillars, banners, braziers, barrels/crates ======================= */

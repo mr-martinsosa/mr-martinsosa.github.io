@@ -232,12 +232,12 @@
 			return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
 		} catch (e) { return false; }
 	}
-	/* skip the 670 KB 3D download for reduced-motion, data-saver, or no-WebGL visitors — and reserve the
-	   full-viewport world for desktop-width screens (mobile/narrow get the boxed page + menu, by design;
-	   the lower-left card + framed rogue + hotspot pills need the room) */
+	/* skip the multi-MB 3D download for reduced-motion, data-saver, or no-WebGL visitors. The full world is
+	   reserved for a DESKTOP (a wide screen AND a fine pointer) — mobile/tablet/touch always get the boxed
+	   2.5D page + menu, regardless of width. */
 	var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
-	var wideEnough = !window.matchMedia || window.matchMedia("(min-width: 960px)").matches;
-	var prefer3D = !reduceMotion && !conn.saveData && wideEnough && webglSupported();
+	var isDesktop = !!window.matchMedia && window.matchMedia("(min-width: 960px) and (pointer: fine)").matches;
+	var prefer3D = !reduceMotion && !conn.saveData && isDesktop && webglSupported();
 	/* optional CC0 .glb character, chosen via ?char=<name> (sanitised); null ⇒ the procedural rogue */
 	var charParam = null;
 	try { charParam = (new URLSearchParams(location.search).get("char") || "").replace(/[^a-z0-9_-]/gi, ""); } catch (e) { charParam = ""; }
@@ -246,9 +246,20 @@
 	var characterUrl = "models/" + (charParam || "adventurer") + ".glb";
 	var characterScale = 1;
 
+	/* the dungeon loading screen — shown only on the desktop 3D path while the (multi-MB) Three.js +
+	   addons + character download; revealed when the world is ready (or on failure / a safety timeout) */
+	var loaderEl = document.getElementById("dungeon-loader");
+	function hideLoader() {
+		if (!loaderEl || loaderEl.hidden) return;
+		loaderEl.classList.add("is-out");
+		setTimeout(function () { loaderEl.hidden = true; }, 600);
+	}
+
 	if (dungeon && heroEl && scene) {
 		var glCanvas = dungeon.querySelector(".dungeon__gl");
 		if (prefer3D && glCanvas) {
+			if (loaderEl) loaderEl.hidden = false;                 /* show the loading screen */
+			var loaderSafety = setTimeout(hideLoader, 15000);      /* never let it hang */
 			import("./dungeon3d.js")
 				.then(function (m) {
 					return m.initDungeon3D({
@@ -256,6 +267,7 @@
 						characterUrl: characterUrl, characterScale: characterScale,
 						/* no usable <dialog> ⇒ no panels ⇒ build no hotspots/fly path (avoids a focused-camera lockup) */
 						hotspots: canPanel ? HOTSPOTS : [],
+						onReady: function () { clearTimeout(loaderSafety); hideLoader(); },   /* scene + character in → reveal */
 						onFlyStart: function (h) { announceTransit(h && h.label); },   /* keep focus off <body> during the fly */
 						onArrive: function (h, btn) { openPanel(h.sel, btn); }          /* fly completes → open that section's panel */
 					});
@@ -266,7 +278,7 @@
 					   is suspended during flights, so describe the actual controls (Tab + arrows, MENU/landmarks) */
 					dungeon.setAttribute("aria-label", "Mini-dungeon — press Tab to focus, then arrow keys (or W A S D) to walk the rogue down the hall; or use the MENU or the glowing landmarks to travel to a section.");
 				})
-				.catch(function (err) { if (window.console && console.warn) { console.warn("3D dungeon unavailable — using 2.5D fallback.", err); } start2DDungeon(); });
+				.catch(function (err) { if (window.console && console.warn) { console.warn("3D dungeon unavailable — using 2.5D fallback.", err); } clearTimeout(loaderSafety); hideLoader(); start2DDungeon(); });
 		} else {
 			start2DDungeon();
 		}

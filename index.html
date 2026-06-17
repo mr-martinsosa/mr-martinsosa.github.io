@@ -59,6 +59,17 @@
 <body>
 	<a class="skip-link" href="#main">Skip to content</a>
 
+	<!-- Loading screen for the 3D dungeon — hidden by default (so no-JS / SEO / mobile never see it);
+	     index.js reveals it only on the desktop WebGL path and dismisses it when the world is ready. -->
+	<div id="dungeon-loader" class="dungeon-loader" role="status" aria-live="polite" hidden>
+		<div class="dungeon-loader__box">
+			<span class="dungeon-loader__glyph" aria-hidden="true">@</span>
+			<p class="dungeon-loader__title">Descending into the dungeon…</p>
+			<div class="dungeon-loader__bar" aria-hidden="true"><i></i></div>
+			<p class="dungeon-loader__sub">Lighting the torches</p>
+		</div>
+	</div>
+
 	<!-- ===== Reusable pixel sprites (inline SVG symbol sheet) ===== -->
 	<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
 		<defs>
