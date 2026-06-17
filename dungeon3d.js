@@ -274,6 +274,10 @@ export function initDungeon3D(opts) {
 	var MODEL_YAW = 0;     /* Quaternius rig faces +Z; the rogue group's PI yaw already turns it down the hall (away from camera), matching the procedural rogue */
 	var character = null, mixer = null, actIdle = null, actWalk = null, actRun = null, curAct = null;
 	if (opts.characterUrl) {
+		/* hide the procedural stand-in up front so it never flashes before the .glb arrives; it's
+		   restored only if the model (or GLTFLoader) actually fails to load */
+		proc.visible = false;
+		var charFailed = function (err) { proc.visible = true; markDirty(); if (window.console && console.warn) console.warn("character model failed to load — using the procedural rogue.", err); };
 		import("./vendor/GLTFLoader.js").then(function (mod) {
 			new mod.GLTFLoader().load(opts.characterUrl, function (gltf) {
 				var model = gltf.scene;
@@ -297,7 +301,7 @@ export function initDungeon3D(opts) {
 					var mats = Array.isArray(o.material) ? o.material : [o.material];
 					mats.forEach(function (mat) { if (mat) { mat.flatShading = true; mat.needsUpdate = true; } });
 				});
-				rogue.add(model); proc.visible = false; character = model;
+				rogue.add(model); proc.visible = false; character = model;   /* proc already hidden above */
 				model.traverse(function (o) { if (o.isMesh && /nurbs|path/i.test(o.name)) o.visible = false; });  /* hide stray weapon-trail curves */
 				mixer = new THREE.AnimationMixer(model);
 				function clip(n) { return THREE.AnimationClip.findByName(gltf.animations, n) || gltf.animations.find(function (a) { return a.name.indexOf(n) >= 0; }); }
@@ -306,9 +310,95 @@ export function initDungeon3D(opts) {
 				if (cw) actWalk = mixer.clipAction(cw);
 				if (cr) actRun = mixer.clipAction(cr);
 				markDirty();
-			}, undefined, function (err) { if (window.console && console.warn) console.warn("character .glb failed to load — keeping the procedural rogue.", err); });
-		}).catch(function (err) { if (window.console && console.warn) console.warn("GLTFLoader unavailable — keeping the procedural rogue.", err); });
+			}, undefined, charFailed);
+		}).catch(charFailed);
 	}
+
+	/* ======================= set dressing: pillars, banners, braziers, barrels/crates ======================= */
+	/* turns the bare tube into a furnished hall — repeating "stations" (a pair of pillars + a banner +
+	   a floor prop) scroll past with the corridor, and a carpet runner leads the eye down the centre */
+	var stoneMat = flat(0x3b3550), stoneCapMat = flat(0x4a4163), metalMat = flat(0x2a2030, { shininess: 14 });
+	var woodMat = flat(0x5b3a1e), woodMat2 = flat(0x6f4d28);
+	var BANNER_COLS = [0xe8c170, 0xb06ad6, 0x5db1e0, 0x9c2f2c];
+	function makePillar(x) {
+		var g = new THREE.Group(); g.position.x = x;
+		g.add(mkAt(new THREE.BoxGeometry(0.5, 0.26, 0.5), stoneCapMat, 0, 0.13, 0));
+		var sh = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, WALL_H - 0.74, 6), stoneMat); sh.position.y = (WALL_H - 0.74) / 2 + 0.26; g.add(sh);
+		g.add(mkAt(new THREE.BoxGeometry(0.52, 0.26, 0.52), stoneCapMat, 0, WALL_H - 0.18, 0));
+		return g;
+	}
+	function makeBanner(col, side) {
+		var g = new THREE.Group(); var x = side * (HALF_W - 0.07), ry = -side * Math.PI / 2;
+		var cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 1.7), new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide }));
+		cloth.position.set(x, WALL_H - 1.2, 0); cloth.rotation.y = ry; g.add(cloth);
+		var tip = new THREE.Mesh(new THREE.ConeGeometry(0.33, 0.34, 3), new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide }));
+		tip.position.set(x, WALL_H - 2.22, 0); tip.rotation.set(Math.PI, ry, 0); tip.scale.z = 0.01; g.add(tip);   /* flat downward point */
+		var em = new THREE.Mesh(new THREE.CircleGeometry(0.12, 6), new THREE.MeshBasicMaterial({ color: 0xe8c170 }));
+		em.position.set(x - side * 0.02, WALL_H - 1.15, 0); em.rotation.y = ry; g.add(em);
+		return g;
+	}
+	function makeBrazier(withLight) {
+		var g = new THREE.Group();
+		g.add(mkAt(new THREE.CylinderGeometry(0.07, 0.11, 0.74, 6), metalMat, 0, 0.37, 0));
+		g.add(mkAt(new THREE.CylinderGeometry(0.23, 0.12, 0.2, 8), metalMat, 0, 0.78, 0));
+		var fl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.92), new THREE.MeshBasicMaterial({ map: flameTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+		fl.position.y = 1.12; g.add(fl);
+		var light = null;
+		if (withLight) { light = new THREE.PointLight(0xff8a3d, 20, 12, 2); light.position.y = 1.15; g.add(light); }
+		g.userData = { flame: fl, light: light, seed: rnd() * 6.28 };
+		return g;
+	}
+	function makeBarrel(x) {
+		var g = new THREE.Group(); g.position.x = x;
+		g.add(mkAt(new THREE.CylinderGeometry(0.21, 0.19, 0.58, 8), woodMat, 0, 0.29, 0));
+		g.add(mkAt(new THREE.CylinderGeometry(0.225, 0.225, 0.05, 8), metalMat, 0, 0.44, 0));
+		g.add(mkAt(new THREE.CylinderGeometry(0.215, 0.215, 0.05, 8), metalMat, 0, 0.16, 0));
+		return g;
+	}
+	function makeCrate(x, s, rot) {
+		var g = new THREE.Group(); g.position.x = x; g.rotation.y = rot || 0;
+		g.add(mkAt(new THREE.BoxGeometry(s, s, s), woodMat2, 0, s / 2, 0));
+		g.add(mkAt(new THREE.BoxGeometry(s + 0.03, 0.05, s + 0.03), metalMat, 0, s, 0));   /* lid rim */
+		return g;
+	}
+	function mkAt(geo, mat, x, y, z) { var m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); return m; }
+
+	var dressing = [];
+	/* stations must tile the wrap window exactly (N*GAP === SPAN) or wrap() overlaps + pops them, like
+	   the arches (8×7) and torches (14×4) do; ~11-unit spacing → 5 stations of SPAN/5 */
+	var STATION_N = Math.round(SPAN / 11), STATION_GAP = SPAN / STATION_N;
+	for (var sti = 0; sti < STATION_N; sti++) {
+		var st = new THREE.Group();
+		st.add(makePillar(-(HALF_W - 0.28))); st.add(makePillar(HALF_W - 0.28));
+		var bside = (sti % 2) ? 1 : -1;
+		st.add(makeBanner(BANNER_COLS[sti % BANNER_COLS.length], bside));
+		var brazier = null;
+		if (sti % 2 === 0) {                                  /* fire bowl on even stations; only the nearest casts a real
+		                                                         light (a warm foreground pool) — the rest glow via the bloom,
+		                                                         keeping the dynamic-light count low */
+			brazier = makeBrazier(sti === 0);
+			brazier.position.x = -bside * (HALF_W - 0.55); st.add(brazier);
+		} else {                                              /* a barrel + crate cluster on odd stations */
+			var px = -bside * (HALF_W - 0.5);
+			st.add(makeBarrel(px)); st.add(makeCrate(px - bside * 0.45, 0.42, 0.4));
+		}
+		st.position.z = NEAR - (sti + 1) * STATION_GAP;
+		st.userData = { brazier: brazier };
+		scene.add(st); dressing.push(st);
+	}
+
+	/* carpet runner down the centre (scrolls with the floor texture) */
+	var runnerTex = px2(function (g, S) {
+		g.fillStyle = "#7a2421"; g.fillRect(0, 0, S, S);                       /* crimson field */
+		g.fillStyle = "#5a1a18"; g.fillRect(0, 0, S * 0.12, S); g.fillRect(S * 0.88, 0, S * 0.12, S);  /* darker borders */
+		g.fillStyle = "#c8a24e"; g.fillRect(S * 0.14, 0, S * 0.04, S); g.fillRect(S * 0.82, 0, S * 0.04, S);  /* gold edge stripes */
+		g.fillStyle = "#c8a24e";                                              /* a row of gold diamonds down the centre */
+		var cx = S / 2, r = S * 0.1;
+		g.beginPath(); g.moveTo(cx, S / 2 - r); g.lineTo(cx + r, S / 2); g.lineTo(cx, S / 2 + r); g.lineTo(cx - r, S / 2); g.closePath(); g.fill();
+	});
+	runnerTex.repeat.set(1, LEN / 5);   /* match the floor's texels-per-unit so the same scroll delta stays locked */
+	var runner = new THREE.Mesh(new THREE.PlaneGeometry(1.5, LEN), new THREE.MeshLambertMaterial({ map: runnerTex }));
+	runner.rotation.x = -Math.PI / 2; runner.position.set(0, 0.015, 0); scene.add(runner);
 
 	/* ======================= slimes (real 3D meshes) ======================= */
 	var slimeBody = new THREE.MeshPhongMaterial({ color: 0x6ab04c, emissive: 0x12300d, shininess: 40, specular: 0x9fe07f, flatShading: true });
@@ -612,6 +702,7 @@ export function initDungeon3D(opts) {
 		if (dz !== 0) {
 			floorTex.offset.y -= dz * 0.18; ceilTex.offset.x += dz * 0.12;
 			wallL.material.map.offset.x -= dz * 0.16; wallR.material.map.offset.x += dz * 0.16;
+			runnerTex.offset.y -= dz * 0.18;   /* keep the carpet in sync with the flagstones */
 		}
 
 		/* is anything still in motion? idle frames are throttled (and frozen under reduced-motion)
@@ -634,6 +725,17 @@ export function initDungeon3D(opts) {
 				T.userData.light.intensity = 38 * fl;
 				T.userData.flame.scale.set(0.85 + fl * 0.3, 0.8 + fl * 0.4, 1);
 				T.userData.flame.material.opacity = 0.7 + fl * 0.3;
+			}
+			/* recycle the dressing stations + flicker their braziers */
+			for (i = 0; i < dressing.length; i++) {
+				var D = dressing[i]; wrap(D, dz);
+				var bz = D.userData.brazier;
+				if (bz) {
+					var bfl = reduceMotion ? 0.85 : 0.7 + Math.sin(time * 10 + bz.userData.seed) * 0.14 + Math.sin(time * 19 + bz.userData.seed) * 0.08;
+					bz.userData.flame.scale.set(0.8 + bfl * 0.3, 0.75 + bfl * 0.45, 1);
+					bz.userData.flame.material.opacity = 0.7 + bfl * 0.3;
+					if (bz.userData.light) bz.userData.light.intensity = 20 * bfl;
+				}
 			}
 
 			var arr = dustGeo.attributes.position.array;
