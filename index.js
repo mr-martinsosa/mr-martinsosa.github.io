@@ -236,6 +236,13 @@
 	var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
 	var wideEnough = !window.matchMedia || window.matchMedia("(min-width: 960px)").matches;
 	var prefer3D = !reduceMotion && !conn.saveData && wideEnough && webglSupported();
+	/* optional CC0 .glb character, chosen via ?char=<name> (sanitised); null ⇒ the procedural rogue */
+	var charParam = null;
+	try { charParam = (new URLSearchParams(location.search).get("char") || "").replace(/[^a-z0-9_-]/gi, ""); } catch (e) { charParam = ""; }
+	/* the dungeon character is a CC0 Quaternius low-poly "Adventurer" (.glb), flat-shaded to match the
+	   scene; overridable via ?char=<name> for swapping/auditing models */
+	var characterUrl = "models/" + (charParam || "adventurer") + ".glb";
+	var characterScale = 1;
 
 	if (dungeon && heroEl && scene) {
 		var glCanvas = dungeon.querySelector(".dungeon__gl");
@@ -244,6 +251,7 @@
 				.then(function (m) {
 					return m.initDungeon3D({
 						dungeon: dungeon, canvas: glCanvas, xpEl: xpEl, reduceMotion: reduceMotion,
+						characterUrl: characterUrl, characterScale: characterScale,
 						/* no usable <dialog> ⇒ no panels ⇒ build no hotspots/fly path (avoids a focused-camera lockup) */
 						hotspots: canPanel ? HOTSPOTS : [],
 						onFlyStart: function (h) { announceTransit(h && h.label); },   /* keep focus off <body> during the fly */

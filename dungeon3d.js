@@ -175,6 +175,8 @@ export function initDungeon3D(opts) {
 	/* ======================= the rogue (procedural low-poly, flat-shaded) ======================= */
 	var ROGUE_H = 1.7;
 	var rogue = new THREE.Group(); rogue.position.set(0, 0, ROGUE_Z); rogue.rotation.y = Math.PI; scene.add(rogue);
+	/* the procedural body lives in its own subgroup so an optional .glb character can hide it wholesale */
+	var proc = new THREE.Group(); rogue.add(proc);
 	function flat(color, o) {
 		o = o || {};
 		return new THREE.MeshPhongMaterial({ color: color, flatShading: true, shininess: o.shininess || 6, specular: o.specular || 0x14121a, emissive: o.emissive || 0x000000 });
@@ -184,23 +186,23 @@ export function initDungeon3D(opts) {
 	function limb(len, w, color, jx, jy) {
 		var g = new THREE.Group(); g.position.set(jx, jy, 0);
 		var m = new THREE.Mesh(new THREE.BoxGeometry(w, len, w), flat(color));
-		m.position.y = -len / 2; g.add(m); rogue.add(g); return g;
+		m.position.y = -len / 2; g.add(m); proc.add(g); return g;
 	}
 	/* body: a 6-sided tapered cloak (narrow shoulders, flared hem) + a gold belt */
 	var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.27, 0.82, 6), flat(C_CLOAK));
-	torso.position.y = 0.92; rogue.add(torso);
+	torso.position.y = 0.92; proc.add(torso);
 	var belt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 6), flat(C_TRIM, { shininess: 30 }));
-	belt.position.y = 0.74; rogue.add(belt);
+	belt.position.y = 0.74; proc.add(belt);
 	/* head + pointed hood, with two faint gold eyes peering out */
 	var head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), flat(C_SKIN));
-	head.position.y = 1.4; rogue.add(head);
+	head.position.y = 1.4; proc.add(head);
 	/* a low, wide cowl that wraps the head — not a witch hat */
 	var hood = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.28, 7), flat(C_HOOD));
-	hood.position.set(0, 1.47, -0.03); rogue.add(hood);
+	hood.position.set(0, 1.47, -0.03); proc.add(hood);
 	/* two glowing eyes with a gap (so it doesn't read as a single-eyed cyclops) */
 	function eye(x) {
 		var e = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.02), new THREE.MeshBasicMaterial({ color: C_TRIM }));
-		e.position.set(x, 1.38, 0.14); rogue.add(e); return e;
+		e.position.set(x, 1.38, 0.14); proc.add(e); return e;
 	}
 	eye(-0.07); eye(0.07);
 	/* arms (pivot at shoulders) + legs (pivot at hips) */
@@ -220,6 +222,52 @@ export function initDungeon3D(opts) {
 	/* dash aura — a scene-space billboard so it always faces the camera (not parented to the turning rogue) */
 	var aura = new THREE.Mesh(new THREE.PlaneGeometry(1.7, ROGUE_H * 1.25), new THREE.MeshBasicMaterial({ map: radialTex("rgba(255,138,61,0.8)", "rgba(255,138,61,0)"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
 	aura.position.set(0, 0.9, ROGUE_Z); scene.add(aura);
+
+	/* ======================= optional CC0 .glb character (Quaternius) =======================
+	   When opts.characterUrl is set, lazily pull GLTFLoader (kept out of the bundle otherwise),
+	   load the model, scale it to ROGUE_H with its feet on the floor, hide the procedural body, and
+	   drive Idle/Walk/Run clips off an AnimationMixer (replacing the hand-keyed limb swing). */
+	/* These Quaternius rigs are skinned (geometry sits near origin, posed by a 100×-scaled armature),
+	   so a static bounding box is unreliable — the whole pack shares one rig, so a single calibrated
+	   scale + ground offset fits them all. The rig's root sits at the feet, centred in x/z. */
+	var MODEL_YAW = 0;     /* Quaternius rig faces +Z; the rogue group's PI yaw already turns it down the hall (away from camera), matching the procedural rogue */
+	var character = null, mixer = null, actIdle = null, actWalk = null, actRun = null, curAct = null;
+	if (opts.characterUrl) {
+		import("./vendor/GLTFLoader.js").then(function (mod) {
+			new mod.GLTFLoader().load(opts.characterUrl, function (gltf) {
+				var model = gltf.scene;
+				/* a static bbox is unreliable for these skinned rigs; the skeleton's bone positions give a
+				   robust height regardless of pack/proportions. Bones span ~92% of full height (head crown +
+				   foot soles reach a little past), so scale to ROGUE_H accordingly and drop the feet to ~floor. */
+				model.updateWorldMatrix(true, true);
+				var skinned = null; model.traverse(function (o) { if (o.isSkinnedMesh && !skinned) skinned = o; });
+				var box = new THREE.Box3(), p = new THREE.Vector3();
+				if (skinned && skinned.skeleton && skinned.skeleton.bones.length) skinned.skeleton.bones.forEach(function (bn) { box.expandByPoint(bn.getWorldPosition(p)); });
+				else box.setFromObject(model);
+				var s = (ROGUE_H * 0.92) / ((box.max.y - box.min.y) || 1) * (opts.characterScale || 1);  /* multiplier corrects stylised (chibi) proportions */
+				model.scale.setScalar(s);
+				model.position.y = -box.min.y * s + ROGUE_H * 0.05;
+				model.rotation.y = MODEL_YAW;
+				/* flat-shade the model so it reads faceted/low-poly like the rest of the scene (Quaternius
+				   meshes ship smooth-shaded) */
+				model.traverse(function (o) {
+					if (!o.isMesh) return;
+					o.frustumCulled = false; o.castShadow = false;
+					var mats = Array.isArray(o.material) ? o.material : [o.material];
+					mats.forEach(function (mat) { if (mat) { mat.flatShading = true; mat.needsUpdate = true; } });
+				});
+				rogue.add(model); proc.visible = false; character = model;
+				model.traverse(function (o) { if (o.isMesh && /nurbs|path/i.test(o.name)) o.visible = false; });  /* hide stray weapon-trail curves */
+				mixer = new THREE.AnimationMixer(model);
+				function clip(n) { return THREE.AnimationClip.findByName(gltf.animations, n) || gltf.animations.find(function (a) { return a.name.indexOf(n) >= 0; }); }
+				var ci = clip("Idle_Sword") || clip("Idle"), cw = clip("Walk"), cr = clip("Run");
+				if (ci) { actIdle = mixer.clipAction(ci); actIdle.play(); curAct = actIdle; }
+				if (cw) actWalk = mixer.clipAction(cw);
+				if (cr) actRun = mixer.clipAction(cr);
+				markDirty();
+			}, undefined, function (err) { if (window.console && console.warn) console.warn("character .glb failed to load — keeping the procedural rogue.", err); });
+		}).catch(function (err) { if (window.console && console.warn) console.warn("GLTFLoader unavailable — keeping the procedural rogue.", err); });
+	}
 
 	/* ======================= slimes (real 3D meshes) ======================= */
 	var slimeBody = new THREE.MeshPhongMaterial({ color: 0x6ab04c, emissive: 0x12300d, shininess: 40, specular: 0x9fe07f, flatShading: true });
@@ -494,14 +542,25 @@ export function initDungeon3D(opts) {
 		var dRot = Math.atan2(Math.sin(rogueFacing - rogue.rotation.y), Math.cos(rogueFacing - rogue.rotation.y));
 		rogue.rotation.y += dRot * Math.min(1, dt * 10);
 
-		/* walk cycle: swing the limbs from their joints; reduced-motion holds a still pose */
-		if (moving && !reduceMotion) stepPhase = (stepPhase + dt * (dashing ? 22 : 12)) % (Math.PI * 2);
-		var sw = (moving && !reduceMotion) ? Math.sin(stepPhase) * (dashing ? 0.95 : 0.6) : 0;
-		armL.rotation.x = sw; armR.rotation.x = -sw;
-		legL.rotation.x = -sw; legR.rotation.x = sw;
-		torso.rotation.z = sw * 0.05;
+		/* walk cycle: an AnimationMixer drives the .glb character, else hand-key the procedural limbs */
+		if (character) {
+			if (mixer && !reduceMotion) mixer.update(dt);
+			var want = moving ? (dashing && actRun ? actRun : (actWalk || actIdle)) : actIdle;
+			if (want && want !== curAct) {
+				if (curAct) curAct.fadeOut(0.18);
+				want.reset().fadeIn(0.18).play();
+				curAct = want;
+			}
+			rogue.position.y = 0;   /* the clips carry their own vertical motion */
+		} else {
+			if (moving && !reduceMotion) stepPhase = (stepPhase + dt * (dashing ? 22 : 12)) % (Math.PI * 2);
+			var sw = (moving && !reduceMotion) ? Math.sin(stepPhase) * (dashing ? 0.95 : 0.6) : 0;
+			armL.rotation.x = sw; armR.rotation.x = -sw;
+			legL.rotation.x = -sw; legR.rotation.x = sw;
+			torso.rotation.z = sw * 0.05;
+			rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
+		}
 		rogue.position.x += (heroX - rogue.position.x) * Math.min(1, dt * 14);
-		rogue.position.y = (moving && !reduceMotion) ? Math.abs(Math.sin(stepPhase * 2)) * 0.05 : 0;
 		/* camera: 2a floating-drift while "home"; 2b click-to-fly tween while flying/focused/returning */
 		updateCamera(dt, time, heroX);
 		aura.position.x = rogue.position.x;
